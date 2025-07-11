@@ -1,3 +1,4 @@
+// src/components/header.tsx
 "use client";
 
 import Link from "next/link";
@@ -14,8 +15,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/icons/logo";
+import { useRouter } from "next/navigation";
 
 export default function Header() {
+  const router = useRouter();
+
+  const navigateTo = (path: string) => {
+    router.push(path);
+  };
+
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:px-6">
       <Link
@@ -45,11 +53,11 @@ export default function Header() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => navigateTo('/dashboard/settings')}>
               <User className="mr-2 h-4 w-4" />
               <span>Profile</span>
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => navigateTo('/dashboard/settings')}>
               <Settings className="mr-2 h-4 w-4" />
               <span>Settings</span>
             </DropdownMenuItem>

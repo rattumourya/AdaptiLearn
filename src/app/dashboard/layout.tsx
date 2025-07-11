@@ -18,7 +18,7 @@ function NavContent() {
       <SidebarContent>
         <SidebarMenu>
           <SidebarMenuItem>
-            <Link href="/dashboard" legacyBehavior passHref>
+            <Link href="/dashboard">
               <SidebarMenuButton tooltip="Library" isActive={pathname === '/dashboard'}>
                 <Library />
                 <span>My Library</span>
@@ -26,7 +26,7 @@ function NavContent() {
             </Link>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <Link href="/dashboard/results" legacyBehavior passHref>
+            <Link href="/dashboard/results">
                <SidebarMenuButton tooltip="My Progress" isActive={pathname === '/dashboard/results'}>
                 <BarChart3 />
                 <span>My Progress</span>

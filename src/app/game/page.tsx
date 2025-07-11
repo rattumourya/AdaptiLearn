@@ -145,15 +145,16 @@ const WordGrid = ({ words, foundWords }: { words: string[], foundWords: string[]
 
 const WordCollection = ({ words, foundWords }: { words: string[], foundWords: string[] }) => {
     const groupedWords = useMemo(() => {
+      const lowercasedFoundWords = new Set(foundWords.map(w => w.toLowerCase()));
       return words.reduce((acc, word) => {
           const len = word.length;
           if (!acc[len]) {
               acc[len] = [];
           }
-          acc[len].push(word);
+          acc[len].push({word, found: lowercasedFoundWords.has(word.toLowerCase())});
           return acc;
-      }, {} as Record<number, string[]>);
-    }, [words]);
+      }, {} as Record<number, {word: string, found: boolean}[]>);
+    }, [words, foundWords]);
 
     return (
         <div className="flex flex-wrap justify-center gap-4 my-4 p-4 bg-muted/50 rounded-lg">
@@ -161,10 +162,10 @@ const WordCollection = ({ words, foundWords }: { words: string[], foundWords: st
                 <div key={len} className="flex flex-col items-center">
                     <h3 className="font-bold text-lg mb-2">{len} Letters</h3>
                     <div className="flex flex-col gap-2">
-                        {groupedWords[len as any].map((word, index) => (
+                        {groupedWords[len as any].map(({word, found}, index) => (
                              <div key={`${word}-${index}`} className="px-4 py-2 rounded bg-background border-2 text-center min-w-[120px]">
-                                 <span className={`text-lg font-semibold uppercase tracking-widest transition-opacity ${foundWords.includes(word.toLowerCase()) ? 'opacity-100' : 'opacity-25'}`}>
-                                    {foundWords.includes(word.toLowerCase()) ? word : "•".repeat(word.length)}
+                                 <span className={`text-lg font-semibold uppercase tracking-widest transition-opacity ${found ? 'opacity-100' : 'opacity-25'}`}>
+                                    {found ? word : "•".repeat(word.length)}
                                  </span>
                              </div>
                         ))}
@@ -480,6 +481,8 @@ function GameComponent() {
 
         switch (currentRound.miniGameType) {
             case 'unscramble':
+                correct = submittedAnswer === currentRound.word.toLowerCase();
+                break;
             case 'multiple-choice':
             case 'categorization':
                 correct = submittedAnswer === currentRound.correctAnswer.toLowerCase();

@@ -364,25 +364,46 @@ function GameComponent() {
   };
 
   const handleRevealAnswer = () => {
-    if (!gameData || !isWordPuzzleGame) return;
-    const wordPuzzleData = gameData.gameData as { letters: string[], mainWords: string[], bonusWords: string[] };
-    
-    const unfoundWord = wordPuzzleData.mainWords.find(
-      (word) => !foundMainWords.includes(word.toLowerCase())
-    );
+    if (!gameData || isCorrect !== null) return;
+    setScore((prev) => Math.max(0, prev - 25)); // Deduct points for revealing
 
-    if (unfoundWord) {
-      setFoundMainWords((prev) => [...prev, unfoundWord.toLowerCase()]);
-      setScore((prev) => Math.max(0, prev - 25)); // Deduct points
+    if (isWordPuzzleGame) {
+      const wordPuzzleData = gameData.gameData as { letters: string[], mainWords: string[], bonusWords: string[] };
+      const unfoundWord = wordPuzzleData.mainWords.find(
+        (word) => !foundMainWords.includes(word.toLowerCase())
+      );
+      if (unfoundWord) {
+        setFoundMainWords((prev) => [...prev, unfoundWord.toLowerCase()]);
+        toast({
+          title: "Answer Revealed!",
+          description: `The word was: ${unfoundWord.toUpperCase()}`,
+        });
+      } else {
+        toast({
+          title: "No more words to reveal!",
+          description: "You've found them all.",
+        });
+      }
+    } else if (isCognitiveGame) {
+      const currentRound = (gameData.gameData as any[])[currentRoundIndex];
+      let correctAnswer: string;
+      switch (currentRound.miniGameType) {
+        case 'unscramble':
+          correctAnswer = currentRound.word;
+          break;
+        case 'true-false':
+          correctAnswer = String(currentRound.isTrue);
+          break;
+        default:
+          correctAnswer = currentRound.correctAnswer;
+          break;
+      }
       toast({
-        title: "Answer Revealed!",
-        description: `The word was: ${unfoundWord.toUpperCase()}`,
+          title: "Answer Revealed!",
+          description: `The correct answer was: ${correctAnswer}`,
       });
-    } else {
-      toast({
-        title: "No more words to reveal!",
-        description: "You've found them all.",
-      });
+      setIsCorrect(false); // Mark as incorrect for progression
+      advanceToNextRound(1500);
     }
   };
 
@@ -485,13 +506,11 @@ function GameComponent() {
                 break;
             case 'multiple-choice':
             case 'categorization':
+            case 'memory':
                 correct = submittedAnswer === currentRound.correctAnswer.toLowerCase();
                 break;
             case 'true-false':
                 correct = (submittedAnswer === 'true') === currentRound.isTrue;
-                break;
-            case 'memory':
-                correct = submittedAnswer === currentRound.correctAnswer.toLowerCase();
                 break;
         }
 
@@ -815,8 +834,8 @@ function GameComponent() {
                  )}
             </div>
              <div className="flex items-center gap-2">
-                {isWordPuzzleGame && (
-                  <Button variant="outline" size="sm" onClick={handleRevealAnswer} disabled={isFinished}>
+                {(isWordPuzzleGame || isCognitiveGame) && (
+                  <Button variant="outline" size="sm" onClick={handleRevealAnswer} disabled={isFinished || isCorrect !== null}>
                     <Eye className="mr-2 h-4 w-4" /> Reveal Answer
                   </Button>
                 )}
@@ -838,3 +857,5 @@ export default function GamePage() {
     </Suspense>
   );
 }
+
+    

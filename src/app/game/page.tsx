@@ -31,6 +31,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
+import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
 
 // Fisher-Yates shuffle algorithm
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -61,14 +64,18 @@ function GameComponent() {
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes (300 seconds)
   const [lives, setLives] = useState(5);
   const [streak, setStreak] = useState(0);
+  const [gameResultId, setGameResultId] = useState<string | null>(null);
 
   useEffect(() => {
     const storedGameData = sessionStorage.getItem("currentGameData");
+    const storedResultId = sessionStorage.getItem("currentGameResultId");
+
     if (!storedGameData) {
       setError("Could not load game data. Please start a new game from the dashboard.");
       setIsLoading(false);
       return;
     }
+    setGameResultId(storedResultId);
 
     try {
       const parsedGameData: CustomizeGameDifficultyOutput = JSON.parse(storedGameData);
@@ -86,33 +93,54 @@ function GameComponent() {
     }
   }, []);
 
+  const finishGame = useCallback(async () => {
+      setIsFinished(true);
+      if (gameResultId) {
+          try {
+              const gameResultRef = doc(db, "gameResults", gameResultId);
+              await updateDoc(gameResultRef, {
+                  score: score,
+                  status: "completed",
+                  completedAt: serverTimestamp(),
+              });
+          } catch (error) {
+              console.error("Failed to save game results:", error);
+              toast({
+                title: "Sync Error",
+                description: "Could not save your final score.",
+                variant: "destructive"
+              });
+          }
+      }
+  }, [gameResultId, score, toast]);
+
   useEffect(() => {
     if (isLoading || isFinished) return;
     if (timeLeft > 0 && lives > 0) {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
       return () => clearTimeout(timer);
     } else if (!isFinished) {
-      setIsFinished(true);
+      finishGame();
     }
-  }, [timeLeft, lives, isLoading, isFinished]);
+  }, [timeLeft, lives, isLoading, isFinished, finishGame]);
 
 
   const advanceToNextRound = useCallback((delay: number) => {
     if (lives <= 0 || timeLeft <= 1) {
-        setIsFinished(true);
+        finishGame();
         return;
     }
     setTimeout(() => {
       const nextRoundIndex = currentRoundIndex + 1;
       if (nextRoundIndex >= (gameData?.gameData.length || 0)) {
-        setIsFinished(true);
+        finishGame();
         return;
       }
       setIsCorrect(null);
       setUserAnswer("");
       setCurrentRoundIndex(nextRoundIndex);
     }, delay);
-  }, [currentRoundIndex, gameData, lives, timeLeft]);
+  }, [currentRoundIndex, gameData, lives, timeLeft, finishGame]);
 
   const handleCorrectAnswer = useCallback((points = 10) => {
     const streakBonus = streak * 2;
@@ -129,11 +157,11 @@ function GameComponent() {
     setIsCorrect(false);
     
     if (newLives <= 0) {
-        setTimeout(() => setIsFinished(true), 1500);
+        setTimeout(() => finishGame(), 1500);
     } else {
         advanceToNextRound(1500);
     }
-  }, [lives, advanceToNextRound]);
+  }, [lives, advanceToNextRound, finishGame]);
 
   const handleSubmitAnswer = (e: React.FormEvent | string) => {
     if (typeof e !== 'string') e.preventDefault();

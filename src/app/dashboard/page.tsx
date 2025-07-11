@@ -73,6 +73,7 @@ import { customizeGameDifficulty } from "@/ai/flows/game-customization";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const uploadSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters."),
@@ -253,7 +254,7 @@ export default function DashboardPage() {
       sessionStorage.setItem("game_document_content", selectedDoc.content);
 
       if (user) {
-        await addDoc(collection(db, "gameResults"), {
+        const gameResultRef = await addDoc(collection(db, "gameResults"), {
           userId: user.uid,
           documentId: selectedDoc.id,
           gameType: selectedGame.name,
@@ -262,6 +263,7 @@ export default function DashboardPage() {
           score: 0,
           startedAt: serverTimestamp(),
         });
+        sessionStorage.setItem("currentGameResultId", gameResultRef.id);
       }
       
       dismiss(toastId);
@@ -269,8 +271,8 @@ export default function DashboardPage() {
 
     } catch (error) {
       console.error("Error customizing game:", error);
+      dismiss(toastId);
       toast({
-        id: toastId,
         title: "Customization Failed",
         description:
           (error as Error).message ||
@@ -310,6 +312,16 @@ export default function DashboardPage() {
           </p>
         </div>
       </div>
+
+       {!isLoadingDocs && documents.length === 0 && (
+         <Alert className="mt-6">
+           <Sparkles className="h-4 w-4" />
+           <AlertTitle>Welcome to AdaptiLearn!</AlertTitle>
+           <AlertDescription>
+             You don't have any documents yet. Add your first one by clicking the card below to start creating personalized games.
+           </AlertDescription>
+         </Alert>
+       )}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-6">
         {isLoadingDocs && Array.from({ length: 3 }).map((_, i) => (

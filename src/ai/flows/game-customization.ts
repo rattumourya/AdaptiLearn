@@ -25,8 +25,8 @@ export type CustomizeGameDifficultyInput = z.infer<
 
 const WordscapesRoundSchema = z.object({
     letters: z.array(z.string()).min(5).max(7).describe('An array of 5-7 letters for the user to form words from.'),
-    mainWords: z.array(z.string()).describe('A list of primary words (3+ letters) for the user to find, which will be displayed in the grid. Every word in this list MUST be formable using only the provided letters.'),
-    bonusWords: z.array(z.string()).describe('An additional list of valid words (3+ letters) that can be formed but are not in the main grid. This list must not contain any words from mainWords. Every word in this list MUST be formable using only the provided letters.'),
+    mainWords: z.array(z.string()).describe('A list of primary words (3+ letters) for the user to find, which will be displayed in the grid. Every word in this list MUST be a valid, real English word and MUST be formable using only the provided letters.'),
+    bonusWords: z.array(z.string()).describe('An additional list of valid, real English words (3+ letters) that can be formed but are not in the main grid. This list must not contain any words from mainWords. Every word in this list MUST be formable using only the provided letters.'),
 });
 
 const SimpleGameRoundSchema = z.object({
@@ -83,14 +83,15 @@ Generate a creative and relevant title for this game session.
 Based on the game type, prepare the 'gameData':
 
 **If the game is 'Wordscapes', 'Word Cookies', or 'Spelling Bee (NYT)':**
-1.  **Extract Key Words:** Analyze the document text to identify 10-15 key vocabulary words that match the 'desiredDifficulty'.
+1.  **Analyze and Extract:** Analyze the document text to identify 10-15 key vocabulary words that match the 'desiredDifficulty'.
 2.  **Select Base Letters:** Choose the longest and most interesting word from the extracted list to be the source for the letter wheel. This word should have 5-7 unique letters. If no single word works, create a compelling set of 5-7 letters based on the document's themes.
-3.  **Generate Word List:** From the chosen 5-7 letters, find ALL possible valid English words of 3 or more letters. **This is a CRITICAL rule: Every word you generate for 'mainWords' and 'bonusWords' MUST be formable using ONLY the letters you selected in this step.** Do not include any words that use letters not in your selected set.
-4.  **Create Game Level:**
+3.  **Generate Word List:** From the chosen 5-7 letters, find ALL possible valid, real English words of 3 or more letters.
+4.  **CRITICAL RULE:** Every word you generate for 'mainWords' and 'bonusWords' MUST be formable using ONLY the letters you selected in step 2, respecting letter counts. For example, if you have one 'L', a word cannot use two 'L's. Do not include any words that use letters not in your selected set.
+5.  **Create Game Level:**
     *   **letters**: An array of the 5-7 letters for the wheel.
-    *   **mainWords**: Select 5-12 of the most relevant or common words from the generated list, ensuring a good mix of word lengths. These will be the words the user needs to find to complete the level.
-    *   **bonusWords**: All other valid words from the generated list that are NOT in \`mainWords\` become bonus words. The \`bonusWords\` list must be mutually exclusive from \`mainWords\`.
-5.  The 'gameData' field should be a single object matching the 'WordscapesRoundSchema'.
+    *   **mainWords**: Select 5-12 of the most relevant or common words from the generated list, ensuring a good mix of word lengths.
+    *   **bonusWords**: All other valid words from the generated list that are NOT in \`mainWords\` become bonus words. The \`mainWords\` and \`bonusWords\` lists MUST NOT contain any of the same words.
+6.  The 'gameData' field should be a single object matching the 'WordscapesRoundSchema'.
 
 **If the game is 'Drops' or 'Elevate':**
 1.  **Analyze and Extract:** Analyze the document to extract a list of 15-20 key vocabulary words and their definitions/context, suitable for the desired difficulty.

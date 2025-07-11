@@ -189,8 +189,8 @@ function isWordValid(word: string, letters: string[]): boolean {
   }
 
   for (const char of wordLower) {
-    if (!letterCounts[char]) {
-      return false; // Letter not available
+    if (!letterCounts[char] || letterCounts[char] === 0) {
+      return false; // Letter not available or not enough of them
     }
     letterCounts[char]--;
   }

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, Suspense, useCallback } from "react";
@@ -31,8 +32,13 @@ import {
   RefreshCw,
   Send,
   Star,
+  Heart,
+  Timer,
+  Check,
+  X,
 } from "lucide-react";
 import type { Game } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 // --- Wordscapes Components ---
 
@@ -122,7 +128,7 @@ const WordGrid = ({ words, foundWords }: { words: string[], foundWords: string[]
             {sortedWords.map(word => (
                 <div key={word} className="flex items-center gap-2">
                     {word.split('').map((letter, index) => (
-                        <div key={index} className="flex items-center justify-center h-8 w-8 rounded bg-background border-2">
+                        <div key={`${word}-${index}`} className="flex items-center justify-center h-8 w-8 rounded bg-background border-2">
                              <span className={`text-xl font-bold uppercase transition-opacity ${foundWords.includes(word) ? 'opacity-100' : 'opacity-0'}`}>
                                 {letter}
                              </span>
@@ -158,7 +164,11 @@ function GameComponent() {
   const [foundMainWords, setFoundMainWords] = useState<string[]>([]);
   const [foundBonusWords, setFoundBonusWords] = useState<string[]>([]);
   const [lastSubmissionStatus, setLastSubmissionStatus] = useState<'correct' | 'bonus' | 'invalid' | 'duplicate' | null>(null);
-
+  
+  // Drops specific state
+  const [timeLeft, setTimeLeft] = useState(300); // 5 minutes
+  const [lives, setLives] = useState(3);
+  const [streak, setStreak] = useState(0);
 
   useEffect(() => {
     const gameId = searchParams.get("gameId");
@@ -221,6 +231,20 @@ function GameComponent() {
   }, [searchParams, toast]);
 
   useEffect(() => {
+    if (!gameData || isLoading || isFinished) return;
+
+    if (gameData.gameType?.toLowerCase().includes('drops')) {
+        if (timeLeft > 0 && lives > 0) {
+            const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
+            return () => clearTimeout(timer);
+        } else {
+            setIsFinished(true);
+        }
+    }
+  }, [timeLeft, lives, gameData, isLoading, isFinished]);
+
+
+  useEffect(() => {
     if (gameData && gameData.gameType?.toLowerCase().includes('wordscapes')) {
         const wordscapesData = gameData.gameData as { letters: string[], mainWords: string[], bonusWords: string[] };
         if (wordscapesData.mainWords.length > 0 && foundMainWords.length === wordscapesData.mainWords.length) {
@@ -256,59 +280,98 @@ function GameComponent() {
     }
   };
 
-  const handleSubmitAnswer = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!gameData || !userAnswer) return;
+  const advanceToNextRound = (delay: number) => {
+    setTimeout(() => {
+        setIsCorrect(null);
+        if (gameData?.gameType?.toLowerCase().includes('drops')) {
+            const dropsGameData = gameData.gameData as any[];
+            if (currentRoundIndex < dropsGameData.length - 1) {
+                setCurrentRoundIndex(currentRoundIndex + 1);
+            } else {
+                setIsFinished(true);
+            }
+        }
+        setUserAnswer("");
+    }, delay);
+  };
 
-    const answer = userAnswer.toLowerCase();
+  const handleCorrectAnswer = () => {
+    const points = 10 + streak * 2;
+    setScore(prev => prev + points);
+    setStreak(prev => prev + 1);
+    setIsCorrect(true);
+    advanceToNextRound(1200);
+  };
+
+  const handleIncorrectAnswer = () => {
+    setLives(prev => prev - 1);
+    setStreak(0);
+    setIsCorrect(false);
+    if (lives - 1 <= 0) {
+        setIsFinished(true);
+    } else {
+        advanceToNextRound(1200);
+    }
+  };
+
+
+  const handleSubmitAnswer = (e: React.FormEvent | string) => {
+    if (typeof e !== 'string') e.preventDefault();
+    if (!gameData || isCorrect !== null) return;
+    
+    const submittedAnswer = (typeof e === 'string' ? e : userAnswer).trim().toLowerCase();
+    if (!submittedAnswer) return;
 
     if (gameData.gameType?.toLowerCase().includes('wordscapes')) {
         const wordscapesData = gameData.gameData as { letters: string[], mainWords: string[], bonusWords: string[] };
 
-        const isMainWord = wordscapesData.mainWords.map(w => w.toLowerCase()).includes(answer);
-        const isBonusWord = wordscapesData.bonusWords.map(w => w.toLowerCase()).includes(answer);
+        const isMainWord = wordscapesData.mainWords.map(w => w.toLowerCase()).includes(submittedAnswer);
+        const isBonusWord = wordscapesData.bonusWords.map(w => w.toLowerCase()).includes(submittedAnswer);
 
         if (isMainWord) {
-            if (foundMainWords.includes(answer)) {
+            if (foundMainWords.includes(submittedAnswer)) {
                 setLastSubmissionStatus('duplicate');
             } else {
                 setLastSubmissionStatus('correct');
-                setFoundMainWords(prev => [...prev, answer]);
-                setScore(prev => prev + answer.length * 10);
+                setFoundMainWords(prev => [...prev, submittedAnswer]);
+                setScore(prev => prev + submittedAnswer.length * 10);
             }
         } else if (isBonusWord) {
-             if (foundBonusWords.includes(answer)) {
+             if (foundBonusWords.includes(submittedAnswer)) {
                 setLastSubmissionStatus('duplicate');
             } else {
                 setLastSubmissionStatus('bonus');
-                setFoundBonusWords(prev => [...prev, answer]);
+                setFoundBonusWords(prev => [...prev, submittedAnswer]);
                 setScore(prev => prev + 5);
             }
         } else {
             setLastSubmissionStatus('invalid');
         }
+        setUserAnswer("");
+        setTimeout(() => setLastSubmissionStatus(null), 1500);
 
-    } else { // Simple unscramble game logic
-      const simpleGameData = gameData.gameData as {word: string}[];
-      const currentWord = simpleGameData[currentRoundIndex].word;
-      const correct = answer.trim().toLowerCase() === currentWord.toLowerCase();
-      setIsCorrect(correct);
-      if (correct) {
-        setScore(score + 1);
-      }
-       setTimeout(() => {
-        setIsCorrect(null);
-        if (currentRoundIndex < simpleGameData.length - 1) {
-          setCurrentRoundIndex(currentRoundIndex + 1);
-        } else {
-          setIsFinished(true);
+    } else { // Logic for Drops and other sequential games
+        const currentRound = (gameData.gameData as any[])[currentRoundIndex];
+        let correct = false;
+
+        switch (currentRound.miniGameType) {
+            case 'unscramble':
+                correct = submittedAnswer === currentRound.word.toLowerCase();
+                break;
+            case 'multiple-choice':
+                correct = submittedAnswer === currentRound.correctAnswer.toLowerCase();
+                break;
+            case 'true-false':
+                correct = (submittedAnswer === 'true') === currentRound.isTrue;
+                break;
         }
-      }, 1500);
-    }
-    setUserAnswer("");
 
-    // Reset feedback after a delay
-    setTimeout(() => setLastSubmissionStatus(null), 1500);
+        if (correct) {
+            handleCorrectAnswer();
+        } else {
+            handleIncorrectAnswer();
+        }
+    }
   };
 
   const getSubmissionFeedback = () => {
@@ -351,35 +414,50 @@ function GameComponent() {
   }
   
   if (isFinished) {
-      const totalWords = gameData?.gameType?.toLowerCase().includes('wordscapes') 
-        ? ((gameData.gameData as any).mainWords?.length || 1)
-        : ((gameData?.gameData as any)?.length || 1);
+    const isWordscapes = gameData?.gameType?.toLowerCase().includes('wordscapes');
+    const totalWords = isWordscapes 
+      ? ((gameData.gameData as any).mainWords?.length || 1)
+      : ((gameData?.gameData as any)?.length || 1);
+    
+    const finalScoreText = isWordscapes ? score : `${score} points`;
+    const finalScoreValue = isWordscapes
+      ? score
+      : score;
 
-      const finalScore = gameData?.gameType?.toLowerCase().includes('wordscapes')
-        ? score 
-        : `${score} / ${totalWords}`;
-        
-      const completionValue = gameData?.gameType?.toLowerCase().includes('wordscapes')
-        ? (foundMainWords.length / totalWords) * 100
-        : (score / totalWords) * 100;
+    const completionMessage = () => {
+        if (isWordscapes) {
+            return `Main words found: ${foundMainWords.length} / ${totalWords}`;
+        }
+        if (lives <= 0) {
+            return "You ran out of lives!";
+        }
+        if (timeLeft <= 0) {
+            return "Time's up!";
+        }
+        return `You completed all the questions!`;
+    };
 
     return (
         <div className="flex min-h-screen items-center justify-center p-4">
             <Card className="w-full max-w-md text-center">
                 <CardHeader>
                     <CardTitle className="font-headline text-3xl">Game Over!</CardTitle>
-                    <CardDescription>You've completed {gameData?.gameTitle}.</CardDescription>
+                    <CardDescription>{completionMessage()}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <p className="text-xl">Your final score is:</p>
-                    <p className="text-5xl font-bold text-primary my-4">{finalScore}</p>
-                    {gameData?.gameType?.toLowerCase().includes('wordscapes') && (
+                    <p className="text-5xl font-bold text-primary my-4">{finalScoreText}</p>
+                    {isWordscapes && (
                         <div className="text-sm text-muted-foreground">
-                            <p>Main words found: {foundMainWords.length} / {totalWords}</p>
                             <p>Bonus words found: {foundBonusWords.length}</p>
                         </div>
                     )}
-                    <Progress value={completionValue} className="mt-4" />
+                     {!isWordscapes && (
+                        <div className="text-sm text-muted-foreground">
+                             <p>Highest streak: {streak}</p>
+                             <p>Rounds completed: {currentRoundIndex + 1} / {totalWords}</p>
+                        </div>
+                    )}
                 </CardContent>
                 <CardFooter>
                     <Button onClick={() => router.push('/dashboard')} className="w-full">
@@ -391,6 +469,124 @@ function GameComponent() {
     )
   }
 
+  const renderGameHeader = () => {
+    const isDrops = gameData?.gameType?.toLowerCase().includes('drops');
+
+    return (
+      <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle className="font-headline text-3xl">{game?.name}</CardTitle>
+              <CardDescription>{gameData?.gameTitle}</CardDescription>
+            </div>
+            {isDrops ? (
+                 <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1.5 text-rose-500 font-semibold">
+                         <Heart className="w-5 h-5"/>
+                         <span>{lives}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-muted-foreground font-semibold">
+                        <Timer className="w-5 h-5"/>
+                        <span>{Math.floor(timeLeft / 60)}:{('0' + timeLeft % 60).slice(-2)}</span>
+                    </div>
+                </div>
+            ) : (
+                <Badge variant="secondary" className="capitalize">
+                    {difficulty}
+                </Badge>
+            )}
+          </div>
+           {gameData?.gameType?.toLowerCase().includes('wordscapes') ? (
+               <Progress value={(foundMainWords.length / ((gameData.gameData as any).mainWords.length || 1)) * 100} className="mt-4" />
+           ) : (
+                <Progress value={((currentRoundIndex + 1) / ((gameData?.gameData as any)?.length || 1)) * 100} className="mt-4" />
+           )}
+      </CardHeader>
+    )
+  };
+
+  const renderCurrentRound = () => {
+    if (!gameData || gameData.gameType?.toLowerCase().includes('wordscapes')) return null;
+
+    const currentRound = (gameData.gameData as any[])[currentRoundIndex];
+    if (!currentRound) return null;
+
+    const getFeedbackRingColor = () => {
+        if (isCorrect === true) return "ring-green-500";
+        if (isCorrect === false) return "ring-red-500";
+        return "ring-transparent";
+    }
+
+    return (
+        <CardContent className={cn("text-center transition-all duration-300", getFeedbackRingColor())}>
+            <div className={`p-4 rounded-lg ring-4 ${getFeedbackRingColor()}`}>
+            {currentRound.miniGameType === 'unscramble' && (
+                <>
+                    <p className="text-muted-foreground mb-2">{currentRound.displayPrompt}</p>
+                    <p className="text-4xl font-bold tracking-widest uppercase my-8">
+                        {currentRound.scrambled}
+                    </p>
+                    <form onSubmit={handleSubmitAnswer}>
+                        <Input
+                            type="text"
+                            placeholder="Type your answer..."
+                            value={userAnswer}
+                            onChange={(e) => setUserAnswer(e.target.value)}
+                            className="text-center text-lg h-12 max-w-sm mx-auto"
+                            disabled={isCorrect !== null}
+                        />
+                        <Button type="submit" className="mt-4 w-full max-w-sm" disabled={isCorrect !== null}>
+                            Submit
+                        </Button>
+                    </form>
+                </>
+            )}
+            {currentRound.miniGameType === 'multiple-choice' && (
+                <>
+                    <p className="text-lg font-semibold mb-6">{currentRound.question}</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {currentRound.options.map((option: string) => (
+                            <Button
+                                key={option}
+                                variant="outline"
+                                className="h-auto py-4 text-base"
+                                onClick={() => handleSubmitAnswer(option)}
+                                disabled={isCorrect !== null}
+                            >
+                                {option}
+                            </Button>
+                        ))}
+                    </div>
+                </>
+            )}
+            {currentRound.miniGameType === 'true-false' && (
+                <>
+                    <p className="text-lg font-semibold mb-6">{currentRound.statement}</p>
+                    <div className="flex justify-center gap-4">
+                        <Button
+                            variant="outline"
+                            className="h-16 w-32 text-lg bg-green-50 hover:bg-green-100 text-green-800"
+                            onClick={() => handleSubmitAnswer("true")}
+                            disabled={isCorrect !== null}
+                        >
+                            <Check className="mr-2"/> True
+                        </Button>
+                        <Button
+                            variant="outline"
+                            className="h-16 w-32 text-lg bg-red-50 hover:bg-red-100 text-red-800"
+                             onClick={() => handleSubmitAnswer("false")}
+                             disabled={isCorrect !== null}
+                        >
+                            <X className="mr-2"/> False
+                        </Button>
+                    </div>
+                </>
+            )}
+            </div>
+        </CardContent>
+    );
+};
+
   return (
     <div className="container mx-auto max-w-3xl py-8">
       <Button variant="ghost" onClick={() => router.push("/dashboard")} className="mb-4">
@@ -398,22 +594,7 @@ function GameComponent() {
         Back to Library
       </Button>
       <Card>
-        <CardHeader>
-          <div className="flex justify-between items-start">
-            <div>
-              <CardTitle className="font-headline text-3xl">{game?.name}</CardTitle>
-              <CardDescription>{gameData?.gameTitle}</CardDescription>
-            </div>
-            <Badge variant="secondary" className="capitalize">
-              {difficulty}
-            </Badge>
-          </div>
-           {gameData?.gameType?.toLowerCase().includes('wordscapes') ? (
-               <Progress value={(foundMainWords.length / ((gameData.gameData as any).mainWords.length || 1)) * 100} className="mt-4" />
-           ) : (
-                <Progress value={((currentRoundIndex + 1) / ((gameData?.gameData as any)?.length || 1)) * 100} className="mt-4" />
-           )}
-        </CardHeader>
+        {renderGameHeader()}
         
         {gameData?.gameType?.toLowerCase().includes('wordscapes') ? (
             // WORDSCAPES UI
@@ -436,47 +617,19 @@ function GameComponent() {
                 </form>
             </CardContent>
         ) : (
-            // SIMPLE UNSCRAMBLE UI
-            <CardContent className="text-center">
-              {(gameData?.gameData as any)?.[currentRoundIndex] && (
-                <div className="my-8">
-                    <p className="text-muted-foreground mb-2">{(gameData?.gameData as any)[currentRoundIndex].displayPrompt}</p>
-                    <p className="text-4xl font-bold tracking-widest uppercase">
-                        {(gameData?.gameData as any)[currentRoundIndex].scrambled}
-                    </p>
-                </div>
-              )}
-            <form onSubmit={handleSubmitAnswer}>
-              <div className="relative max-w-sm mx-auto">
-                <Input
-                  type="text"
-                  placeholder="Type your answer here..."
-                  value={userAnswer}
-                  onChange={(e) => setUserAnswer(e.target.value)}
-                  className={`text-center text-lg h-12 ${
-                      isCorrect === true ? 'border-green-500 focus-visible:ring-green-500' : ''
-                  } ${
-                      isCorrect === false ? 'border-red-500 focus-visible:ring-red-500' : ''
-                  }`}
-                  disabled={isCorrect !== null}
-                />
-                {isCorrect === true && <CheckCircle className="absolute right-3 top-3 h-6 w-6 text-green-500" />}
-                {isCorrect === false && <XCircle className="absolute right-3 top-3 h-6 w-6 text-red-500" />}
-              </div>
-              <Button type="submit" className="mt-4 w-full max-w-sm" disabled={isCorrect !== null}>
-                  Submit
-              </Button>
-            </form>
-          </CardContent>
+            // DYNAMIC MINI-GAME UI
+            renderCurrentRound()
         )}
         
         <CardFooter className="flex justify-between items-center">
             <div>
                  <p className="text-sm text-muted-foreground">Score: {score}</p>
-                 {gameData?.gameType?.toLowerCase().includes('wordscapes') && (
+                 {gameData?.gameType?.toLowerCase().includes('wordscapes') ? (
                      <p className="text-sm text-muted-foreground flex items-center gap-1">
                         <Star className="w-3 h-3 text-yellow-500"/> Bonus Words: {foundBonusWords.length}
                     </p>
+                 ) : (
+                     <p className="text-sm text-muted-foreground">Streak: {streak}x</p>
                  )}
             </div>
             <Button variant="outline" onClick={handleGetHint} disabled={isHintLoading}>

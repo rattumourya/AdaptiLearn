@@ -30,21 +30,21 @@ const WordscapesRoundSchema = z.object({
 });
 
 const SimpleGameRoundSchema = z.object({
-    miniGameType: z.literal('unscramble').describe("The type of this mini-game round."),
+    miniGameType: z.enum(['unscramble']).describe("The type of this mini-game round."),
     word: z.string().describe('The correct word for the round.'),
     scrambled: z.string().describe('The scrambled/jumbled version of the word to show the user.'),
     displayPrompt: z.string().describe('The prompt to show the user for this round (e.g., "Unscramble the word").')
 });
 
 const MultipleChoiceRoundSchema = z.object({
-    miniGameType: z.literal('multiple-choice').describe("The type of this mini-game round."),
+    miniGameType: z.enum(['multiple-choice']).describe("The type of this mini-game round."),
     question: z.string().describe("The question or definition to ask the user."),
     options: z.array(z.string()).describe("A list of 4 possible answers."),
     correctAnswer: z.string().describe("The correct answer from the options."),
 });
 
 const TrueFalseRoundSchema = z.object({
-    miniGameType: z.literal('true-false').describe("The type of this mini-game round."),
+    miniGameType: z.enum(['true-false']).describe("The type of this mini-game round."),
     statement: z.string().describe("A statement to present to the user."),
     isTrue: z.boolean().describe("Whether the statement is true or false."),
 });

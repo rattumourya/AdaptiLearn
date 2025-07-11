@@ -46,20 +46,23 @@ export default function ResultsPage() {
     if (user) {
       setIsLoading(true);
       const resultsRef = collection(db, "gameResults");
+      // Simplified query to avoid composite index requirement.
+      // We will filter for completed games on the client-side.
       const q = query(
         resultsRef,
         where("userId", "==", user.uid),
-        where("status", "==", "completed"),
         orderBy("completedAt", "desc")
       );
 
       const unsubscribe = onSnapshot(
         q,
         (querySnapshot) => {
-          const userResults = querySnapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          })) as GameResult[];
+          const userResults = querySnapshot.docs
+            .map((doc) => ({
+              id: doc.id,
+              ...doc.data(),
+            }))
+            .filter(result => result.status === 'completed') as GameResult[];
           setResults(userResults);
           setIsLoading(false);
         },

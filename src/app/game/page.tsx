@@ -91,16 +91,20 @@ function GameComponent() {
     if (timeLeft > 0 && lives > 0) {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
       return () => clearTimeout(timer);
-    } else {
-      setIsFinished(true); // End game when time or lives run out
+    } else if (!isFinished) {
+      setIsFinished(true);
     }
   }, [timeLeft, lives, isLoading, isFinished]);
 
 
   const advanceToNextRound = useCallback((delay: number) => {
+    if (lives <= 0 || timeLeft <= 1) {
+        setIsFinished(true);
+        return;
+    }
     setTimeout(() => {
       const nextRoundIndex = currentRoundIndex + 1;
-      if (nextRoundIndex >= (gameData?.gameData.length || 0) || lives <= 0 || timeLeft <= 0) {
+      if (nextRoundIndex >= (gameData?.gameData.length || 0)) {
         setIsFinished(true);
         return;
       }
@@ -211,7 +215,7 @@ function GameComponent() {
       title: 'Answer Revealed',
       description: `The correct answer was: ${correctAnswer}`,
     });
-    handleIncorrectAnswer(); // Treat revealing as an incorrect answer
+    handleIncorrectAnswer();
   };
 
   if (isLoading) {
@@ -290,15 +294,9 @@ function GameComponent() {
   function CurrentRoundComponent() {
     const feedbackClass = isCorrect === true ? 'ring-green-500' : isCorrect === false ? 'ring-red-500' : 'ring-transparent';
 
-    // Memoize the shuffled options so they don't re-shuffle on every render
-    const shuffledImageOptions = useMemo(() => {
+    const shuffledWordOptions = useMemo(() => {
         if (currentRound.miniGameType === 'word-image-match') {
-            const options = [
-                { word: currentRound.word, image: currentRound.correctImageDataUri },
-                ...currentRound.distractorWords.map(word => ({ word, image: `https://placehold.co/150x150.png` }))
-            ];
-            const correctImageFirst = options.map(opt => ({...opt, isCorrect: opt.word === currentRound.word}));
-            return shuffleArray(correctImageFirst);
+            return shuffleArray([currentRound.word, ...currentRound.distractorWords]);
         }
         return [];
     }, [currentRound]);
@@ -317,23 +315,30 @@ function GameComponent() {
                 <p className="font-semibold text-lg mb-4">{currentRound.displayPrompt}</p>
 
                 {currentRound.miniGameType === 'word-image-match' && (
-                    <div className="grid grid-cols-2 gap-4">
-                        {shuffledImageOptions.map(option => (
-                           <Button key={option.word} variant="outline" className="h-auto p-2 flex flex-col gap-2" onClick={() => handleSubmitAnswer(option.word)} disabled={isCorrect !== null}>
-                               <Image src={option.image} alt={option.word} width={150} height={150} className="rounded-md object-cover" data-ai-hint="object concept"/>
-                               {option.word}
-                           </Button>
-                        ))}
+                    <div className="flex flex-col items-center gap-4">
+                        <div className="relative w-48 h-48 mb-4">
+                           <Image src={currentRound.imageDataUri} alt={currentRound.word} layout="fill" className="rounded-md object-cover" data-ai-hint="object concept"/>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 w-full">
+                           {shuffledWordOptions.map(word => (
+                               <Button key={word} variant="outline" className="h-16 text-base" onClick={() => handleSubmitAnswer(word)} disabled={isCorrect !== null}>
+                                   {word}
+                               </Button>
+                           ))}
+                        </div>
                     </div>
                 )}
                 
                 {currentRound.miniGameType === 'word-translation-match' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {shuffledTranslationOptions.map(translation => (
-                            <Button key={translation} variant="outline" className="h-16 text-base" onClick={() => handleSubmitAnswer(translation)} disabled={isCorrect !== null}>
-                                {translation}
-                            </Button>
-                        ))}
+                    <div className="flex flex-col items-center gap-4">
+                        <p className="text-4xl font-bold my-4">{currentRound.word}</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+                            {shuffledTranslationOptions.map(translation => (
+                                <Button key={translation} variant="outline" className="h-16 text-base" onClick={() => handleSubmitAnswer(translation)} disabled={isCorrect !== null}>
+                                    {translation}
+                                </Button>
+                            ))}
+                        </div>
                     </div>
                 )}
                 

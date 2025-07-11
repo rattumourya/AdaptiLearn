@@ -179,7 +179,7 @@ export default function DashboardPage() {
       return;
     }
     setIsProcessing(true);
-    toast({
+    const { id: toastId } = toast({
       title: "Processing document...",
       description: "Saving your document to the cloud.",
     });
@@ -195,6 +195,7 @@ export default function DashboardPage() {
       uploadForm.reset();
       setUploadOpen(false);
       toast({
+        id: toastId,
         title: "Success!",
         description: `Your document "${values.title}" has been added.`,
         variant: "default",
@@ -202,6 +203,7 @@ export default function DashboardPage() {
     } catch (error) {
       console.error("Error adding document:", error);
       toast({
+        id: toastId,
         title: "Upload Failed",
         description: (error as Error).message || "There was an error saving your document.",
         variant: "destructive",
@@ -236,7 +238,7 @@ export default function DashboardPage() {
   ) => {
     if (!selectedDoc || !selectedGame) return;
     setIsProcessing(true);
-    toast({
+    const { id: toastId, dismiss } = toast({
       title: "Customizing game...",
       description: `Generating a new ${selectedGame.name} game for you. This may take a moment.`,
     });
@@ -250,7 +252,6 @@ export default function DashboardPage() {
       sessionStorage.setItem("currentGameData", JSON.stringify(gameData));
       sessionStorage.setItem("game_document_content", selectedDoc.content);
 
-      // Optional: Save game result skeleton to Firestore
       if (user) {
         await addDoc(collection(db, "gameResults"), {
           userId: user.uid,
@@ -262,21 +263,22 @@ export default function DashboardPage() {
           startedAt: serverTimestamp(),
         });
       }
-
+      
+      dismiss(toastId);
       router.push(`/game`);
+
     } catch (error) {
       console.error("Error customizing game:", error);
       toast({
+        id: toastId,
         title: "Customization Failed",
         description:
           (error as Error).message ||
           "Could not generate a custom game. Please try again.",
         variant: "destructive",
       });
-    } finally {
       setIsProcessing(false);
-      setGameCustomizeOpen(false);
-    }
+    } 
   };
 
   const openGameSelection = (doc: Document) => {

@@ -189,7 +189,7 @@ const WordGrid = ({ words, foundWords }: { words: string[], foundWords: string[]
             {sortedWords.map((word, wordIndex) => (
                 <div key={`${word}-${wordIndex}`} className="flex items-center gap-2">
                     {word.split('').map((letter, index) => (
-                        <div key={`${word}-${index}`} className="flex items-center justify-center h-8 w-8 rounded bg-background border-2">
+                        <div key={`${word}-${wordIndex}-${index}`} className="flex items-center justify-center h-8 w-8 rounded bg-background border-2">
                              <span className={`text-xl font-bold uppercase transition-opacity ${foundWords.includes(word) ? 'opacity-100' : 'opacity-0'}`}>
                                 {letter}
                              </span>
@@ -300,9 +300,8 @@ function GameComponent() {
   useEffect(() => {
     const gameId = searchParams.get("gameId");
     const difficultyParam = searchParams.get("difficulty");
-    const source = searchParams.get("source");
 
-    if (!gameId || !difficultyParam || !source) {
+    if (!gameId || !difficultyParam) {
       setError("Missing game information. Please go back and select a game.");
       setIsLoading(false);
       return;
@@ -944,5 +943,3 @@ export default function GamePage() {
     </Suspense>
   );
 }
-
-    

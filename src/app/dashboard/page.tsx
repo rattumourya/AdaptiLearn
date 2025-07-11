@@ -113,6 +113,9 @@ export default function DashboardPage() {
           description: "Please upload a .txt file for now. PDF and other formats are not yet supported.",
           variant: "destructive",
         });
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
       }
     }
   };
@@ -172,14 +175,11 @@ export default function DashboardPage() {
       });
       console.log("Customized Game Parameters:", gameData);
       
-      // Store the generated game data in session storage to pass to the game page.
-      // This is more robust than passing huge objects in URL params.
       sessionStorage.setItem('currentGameData', JSON.stringify(gameData));
       
       const params = new URLSearchParams({
         gameId: selectedGame.id,
         difficulty: values.difficulty,
-        source: 'dashboard',
       });
 
       router.push(`/game?${params.toString()}`);
@@ -331,16 +331,15 @@ export default function DashboardPage() {
             </CardFooter>
           </Card>
         ))}
-        <Dialog open={isUploadOpen} onOpenChange={setUploadOpen}>
-            <DialogTrigger asChild>
-                <Card className="flex cursor-pointer items-center justify-center border-2 border-dashed bg-transparent transition-all hover:shadow-lg">
-                    <div className="flex flex-col items-center p-8 text-center">
-                        <PlusCircle className="h-12 w-12 text-muted-foreground" />
-                        <span className="mt-2 text-sm font-medium text-muted-foreground">Add New Document</span>
-                    </div>
-                </Card>
-            </DialogTrigger>
-        </Dialog>
+        <Card 
+            className="flex cursor-pointer items-center justify-center border-2 border-dashed bg-transparent transition-all hover:shadow-lg"
+            onClick={() => setUploadOpen(true)}
+        >
+            <div className="flex flex-col items-center p-8 text-center">
+                <PlusCircle className="h-12 w-12 text-muted-foreground" />
+                <span className="mt-2 text-sm font-medium text-muted-foreground">Add New Document</span>
+            </div>
+        </Card>
       </div>
 
       {/* Game Selection Modal */}
@@ -353,7 +352,7 @@ export default function DashboardPage() {
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[70vh] p-1">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 p-4">
               {MOCK_GAMES.map((game) => (
                 <Card
                   key={game.id}
@@ -427,5 +426,3 @@ export default function DashboardPage() {
     </>
   );
 }
-
-    

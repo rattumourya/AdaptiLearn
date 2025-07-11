@@ -26,6 +26,7 @@ import {
   deleteDoc,
   doc,
   serverTimestamp,
+  Timestamp,
 } from "firebase/firestore";
 import * as pdfjs from "pdfjs-dist/build/pdf";
 import * as mammoth from "mammoth";
@@ -361,6 +362,16 @@ export default function DashboardPage() {
     setGameSelectOpen(false);
   };
 
+  const getSafeDate = (timestamp: any): Date => {
+      if (timestamp instanceof Timestamp) {
+        return timestamp.toDate();
+      }
+      if (timestamp && typeof timestamp.seconds === 'number') {
+        return new Date(timestamp.seconds * 1000);
+      }
+      return new Date(timestamp as string);
+  };
+
   if (authLoading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -431,12 +442,7 @@ export default function DashboardPage() {
                   <FileText className="h-8 w-8 text-primary" />
                   {doc.createdAt && (
                     <Badge variant="outline">
-                      {formatDistanceToNow(
-                        (doc.createdAt as any).toDate
-                          ? (doc.createdAt as any).toDate()
-                          : new Date(doc.createdAt as string),
-                        { addSuffix: true }
-                      )}
+                      {formatDistanceToNow(getSafeDate(doc.createdAt), { addSuffix: true })}
                     </Badge>
                   )}
                 </div>

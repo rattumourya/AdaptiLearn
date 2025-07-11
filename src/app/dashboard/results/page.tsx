@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
+import { collection, query, where, Timestamp, onSnapshot } from "firebase/firestore";
 import { BarChart3, CheckCircle, Clock, Gamepad2, Loader2, Star, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 
@@ -46,8 +46,6 @@ export default function ResultsPage() {
     if (user) {
       setIsLoading(true);
       const resultsRef = collection(db, "gameResults");
-      // Query only by userId to avoid needing a composite index.
-      // Filtering and sorting will be done on the client.
       const q = query(
         resultsRef,
         where("userId", "==", user.uid)
@@ -61,10 +59,12 @@ export default function ResultsPage() {
               id: doc.id,
               ...doc.data(),
             }))
-            // Filter for completed games on the client
             .filter(result => result.status === 'completed' && result.completedAt)
-            // Sort by completion date on the client
-            .sort((a, b) => b.completedAt.toMillis() - a.completedAt.toMillis()) as GameResult[];
+            .sort((a, b) => {
+                const dateA = a.completedAt instanceof Timestamp ? a.completedAt.toMillis() : (a.completedAt.seconds * 1000);
+                const dateB = b.completedAt instanceof Timestamp ? b.completedAt.toMillis() : (b.completedAt.seconds * 1000);
+                return dateB - dateA;
+            }) as GameResult[];
             
           setResults(userResults);
           setIsLoading(false);
@@ -78,6 +78,16 @@ export default function ResultsPage() {
       return () => unsubscribe();
     }
   }, [user]);
+
+  const getSafeDate = (timestamp: any): Date => {
+      if (timestamp instanceof Timestamp) {
+        return timestamp.toDate();
+      }
+      if (timestamp && typeof timestamp.seconds === 'number') {
+        return new Date(timestamp.seconds * 1000);
+      }
+      return new Date(); // Fallback for invalid date
+  };
 
   const renderSkeleton = () => (
     <div className="space-y-4">
@@ -148,7 +158,7 @@ export default function ResultsPage() {
                     </TableCell>
                     <TableCell className="text-right text-muted-foreground">
                       {result.completedAt
-                        ? format(result.completedAt.toDate(), "MMM d, yyyy 'at' h:mm a")
+                        ? format(getSafeDate(result.completedAt), "MMM d, yyyy 'at' h:mm a")
                         : "N/A"}
                     </TableCell>
                   </TableRow>

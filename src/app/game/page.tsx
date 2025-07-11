@@ -298,8 +298,6 @@ function GameComponent() {
 
 
   useEffect(() => {
-    const gameId = searchParams.get("gameId");
-    const difficultyParam = searchParams.get("difficulty");
     const storedGameData = sessionStorage.getItem("currentGameData");
 
     if (!storedGameData) {

@@ -49,7 +49,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import type { Document, Game } from "@/lib/types";
+import type { Document } from "@/lib/types";
 import { MOCK_DOCUMENTS, MOCK_GAMES } from "@/lib/mock-data";
 import {
   Select,
@@ -184,6 +184,8 @@ export default function DashboardPage() {
       console.log("Customized Game Parameters:", gameData);
       
       sessionStorage.setItem('currentGameData', JSON.stringify(gameData));
+      // Set document context for hint generation
+      sessionStorage.setItem('game_document_content', selectedDoc.content);
       
       router.push(`/game`);
 

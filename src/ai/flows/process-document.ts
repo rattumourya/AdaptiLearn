@@ -45,8 +45,24 @@ const processDocumentFlow = ai.defineFlow(
     inputSchema: ProcessDocumentInputSchema,
     outputSchema: ProcessDocumentOutputSchema,
   },
-  async input => {
-    const {output} = await extractVocabularyPrompt(input);
-    return output!;
+  async (input) => {
+    let attempts = 0;
+    while (attempts < 2) {
+      try {
+        const {output} = await extractVocabularyPrompt(input);
+        return output!;
+      } catch (error: any) {
+        attempts++;
+        if (attempts >= 2) {
+          console.error("AI call failed after multiple attempts:", error);
+          throw new Error("The AI model is currently overloaded. Please try again in a few moments.");
+        }
+        console.log("AI call failed, retrying...", error.message);
+        // Wait for a second before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+     // This part should be unreachable, but it satisfies TypeScript's need for a return path.
+    throw new Error("Failed to get a response from the AI model.");
   }
 );

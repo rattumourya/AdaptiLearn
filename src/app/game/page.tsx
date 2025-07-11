@@ -1,8 +1,8 @@
 
 "use client";
 
-import { useEffect, useState, Suspense, useCallback, useMemo } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useEffect, useState, Suspense, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -11,265 +11,32 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { MOCK_GAMES } from "@/lib/mock-data";
 import { generateHint } from "@/ai/flows/generate-hint";
-import {
-  type CustomizeGameDifficultyOutput,
-} from "@/ai/flows/game-customization";
+import type { CustomizeGameDifficultyOutput, GameRoundSchema } from "@/ai/flows/game-customization";
 import {
   Loader2,
   Lightbulb,
-  CheckCircle,
-  XCircle,
-  ChevronLeft,
-  RefreshCw,
-  Send,
-  Star,
-  Heart,
-  Timer,
   Check,
   X,
+  ChevronLeft,
   Eye,
   BrainCircuit,
-  Shapes,
+  Timer,
+  Heart,
+  Sparkles,
 } from "lucide-react";
-import type { Game } from "@/lib/types";
 import { cn } from "@/lib/utils";
-
-// --- Spelling Bee Components ---
-const Honeycomb = ({
-  letters,
-  centerLetter,
-  onLetterClick,
-  onShuffle,
-}: {
-  letters: string[];
-  centerLetter: string;
-  onLetterClick: (letter: string) => void;
-  onShuffle: () => void;
-}) => {
-  const outerLetters = useMemo(() => letters.filter((l) => l.toLowerCase() !== centerLetter.toLowerCase()), [letters, centerLetter]);
-
-  const positions = [
-    { top: '0%', left: '50%' },     // Top
-    { top: '25%', left: '93.3%' }, // Top-right
-    { top: '75%', left: '93.3%' }, // Bottom-right
-    { top: '100%', left: '50%' },   // Bottom
-    { top: '75%', left: '6.7%' },  // Bottom-left
-    { top: '25%', left: '6.7%' },   // Top-left
-  ];
-
-  return (
-    <div className="flex flex-col items-center gap-4 my-8">
-      <div className="relative h-48 w-48 sm:h-56 sm:w-56">
-        {/* Center Letter */}
-        <button
-          onClick={() => onLetterClick(centerLetter)}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center w-[33.33%] h-[33.33%] bg-primary text-primary-foreground font-bold uppercase text-2xl"
-          style={{ clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' }}
-        >
-          {centerLetter}
-        </button>
-        {/* Outer Letters */}
-        {outerLetters.map((letter, index) => (
-          <button
-            key={letter}
-            onClick={() => onLetterClick(letter)}
-            className="absolute flex items-center justify-center w-[33.33%] h-[33.33%] bg-card hover:bg-muted font-bold uppercase text-2xl"
-            style={{
-              clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
-              transform: 'translate(-50%, -50%)',
-              ...positions[index],
-            }}
-          >
-            {letter}
-          </button>
-        ))}
-      </div>
-      <Button onClick={onShuffle} variant="ghost" size="icon">
-        <RefreshCw className="h-5 w-5" />
-        <span className="sr-only">Shuffle</span>
-      </Button>
-    </div>
-  );
-};
-
-
-// --- Wordscapes Components ---
-
-const LetterWheel = ({
-  letters,
-  onWordChange,
-}: {
-  letters: string[];
-  onWordChange: (word: string) => void;
-}) => {
-  const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
-  const [currentWord, setCurrentWord] = useState("");
-  const [shuffledLetters, setShuffledLetters] = useState([...letters]);
-
-  const handleLetterClick = (index: number) => {
-    let newIndices;
-    if (selectedIndices.includes(index)) {
-      // Allow unselecting the last letter
-      if (selectedIndices.at(-1) === index) {
-        newIndices = selectedIndices.slice(0, -1);
-      } else {
-        return; // Don't allow unselecting from the middle
-      }
-    } else {
-      newIndices = [...selectedIndices, index];
-    }
-    
-    setSelectedIndices(newIndices);
-    const newWord = newIndices.map((i) => shuffledLetters[i]).join("");
-    setCurrentWord(newWord);
-    onWordChange(newWord);
-  };
-
-  const shuffleLetters = useCallback(() => {
-    setShuffledLetters((prev) => [...prev].sort(() => Math.random() - 0.5));
-    setSelectedIndices([]);
-    setCurrentWord("");
-    onWordChange("");
-  }, [onWordChange]);
-
-  useEffect(() => {
-    shuffleLetters();
-  }, [letters, shuffleLetters]);
-
-  return (
-    <div className="flex flex-col items-center gap-4 my-8">
-      <div className="relative h-64 w-64">
-        {shuffledLetters.map((letter, index) => {
-          const angle = (index / shuffledLetters.length) * 2 * Math.PI;
-          const x = 96 * Math.cos(angle - Math.PI / 2); // 96 is radius
-          const y = 96 * Math.sin(angle - Math.PI / 2);
-          return (
-            <button
-              key={`${letter}-${index}`}
-              onClick={() => handleLetterClick(index)}
-              className={`absolute flex h-16 w-16 items-center justify-center rounded-full text-2xl font-bold uppercase shadow-md transition-all
-                ${
-                  selectedIndices.includes(index)
-                    ? "bg-primary text-primary-foreground scale-105"
-                    : "bg-card hover:bg-muted"
-                }`}
-              style={{
-                transform: `translate(-50%, -50%) translate(${x}px, ${y}px)`,
-                left: "50%",
-                top: "50%",
-              }}
-            >
-              {letter}
-            </button>
-          );
-        })}
-      </div>
-       <Button onClick={shuffleLetters} variant="ghost" size="icon">
-        <RefreshCw className="h-5 w-5" />
-        <span className="sr-only">Shuffle</span>
-      </Button>
-    </div>
-  );
-};
-
-const WordGrid = ({ words, foundWords }: { words: string[], foundWords: string[] }) => {
-    // Sort words by length for a typical puzzle feel
-    const sortedWords = useMemo(() => [...words].sort((a, b) => a.length - b.length), [words]);
-
-    return (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-2 my-4 p-4 bg-muted/50 rounded-lg">
-            {sortedWords.map((word, wordIndex) => (
-                <div key={`${word}-${wordIndex}`} className="flex items-center gap-2">
-                    {word.split('').map((letter, index) => (
-                        <div key={`${word}-${wordIndex}-${index}`} className="flex items-center justify-center h-8 w-8 rounded bg-background border-2">
-                             <span className={`text-xl font-bold uppercase transition-opacity ${foundWords.includes(word) ? 'opacity-100' : 'opacity-0'}`}>
-                                {letter}
-                             </span>
-                        </div>
-                    ))}
-                </div>
-            ))}
-        </div>
-    );
-};
-
-const WordCollection = ({ words, foundWords }: { words: string[], foundWords: string[] }) => {
-    const groupedWords = useMemo(() => {
-      const lowercasedFoundWords = new Set(foundWords.map(w => w.toLowerCase()));
-      return words.reduce((acc, word) => {
-          const len = word.length;
-          if (!acc[len]) {
-              acc[len] = [];
-          }
-          acc[len].push({word, found: lowercasedFoundWords.has(word.toLowerCase())});
-          return acc;
-      }, {} as Record<number, {word: string, found: boolean}[]>);
-    }, [words, foundWords]);
-
-    return (
-        <div className="flex flex-wrap justify-center gap-4 my-4 p-4 bg-muted/50 rounded-lg">
-            {Object.entries(groupedWords).sort().map(([len, lenWords]) => (
-                <div key={len} className="flex flex-col items-center">
-                    <h3 className="font-bold text-lg mb-2">{len} Letters</h3>
-                    <div className="flex flex-col gap-2">
-                        {lenWords.map(({word, found}, index) => (
-                             <div key={`${word}-${index}`} className="px-4 py-2 rounded bg-background border-2 text-center min-w-[120px]">
-                                 <span className={`text-lg font-semibold uppercase tracking-widest transition-opacity ${found ? 'opacity-100' : 'opacity-25'}`}>
-                                    {found ? word : "•".repeat(word.length)}
-                                 </span>
-                             </div>
-                        ))}
-                    </div>
-                </div>
-            ))}
-        </div>
-    );
-};
-
-// --- Game Logic ---
-
-/**
- * Validates if a word can be formed from a given set of letters, respecting letter counts.
- * @param word The word to validate (e.g., "apple").
- * @param letters The available letters (e.g., ['a', 'p', 'p', 'l', 'e']).
- * @returns True if the word is valid, false otherwise.
- */
-function isWordValid(word: string, letters: string[]): boolean {
-  if (!word || !letters.length) return false;
-  const wordLower = word.toLowerCase();
-  const lettersLower = letters.map(l => l.toLowerCase());
-  
-  const letterCounts = lettersLower.reduce((acc, letter) => {
-    acc[letter] = (acc[letter] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  for (const char of wordLower) {
-    if (!letterCounts[char] || letterCounts[char] === 0) {
-      return false; // Letter not available or not enough of them
-    }
-    letterCounts[char]--;
-  }
-
-  return true;
-}
-
+import Image from "next/image";
 
 function GameComponent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  const [game, setGame] = useState<Game | null>(null);
-  const [difficulty, setDifficulty] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -281,171 +48,121 @@ function GameComponent() {
   const [isHintLoading, setIsHintLoading] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
 
-  // Wordscapes/Word Cookies/Spelling Bee specific state
-  const [shuffledLetters, setShuffledLetters] = useState<string[]>([]);
-  const [foundMainWords, setFoundMainWords] = useState<string[]>([]);
-  const [foundBonusWords, setFoundBonusWords] = useState<string[]>([]);
-  const [lastSubmissionStatus, setLastSubmissionStatus] = useState<'correct' | 'bonus' | 'invalid' | 'duplicate' | null>(null);
-  
-  // Drops/Elevate specific state
-  const [timeLeft, setTimeLeft] = useState(300); // 5 minutes
-  const [lives, setLives] = useState(3);
+  // Time-limited session state
+  const [timeLeft, setTimeLeft] = useState(300); // 5 minutes (300 seconds)
+  const [lives, setLives] = useState(5);
   const [streak, setStreak] = useState(0);
-  const [memoryPhase, setMemoryPhase] = useState<'showing' | 'answering'>('showing');
-  
-  const isWordPuzzleGame = gameData?.gameType?.toLowerCase().includes('wordscapes') || gameData?.gameType?.toLowerCase().includes('word cookies') || gameData?.gameType?.toLowerCase().includes('spelling bee');
-  const isCognitiveGame = gameData?.gameType?.toLowerCase().includes('drops') || gameData?.gameType?.toLowerCase().includes('elevate');
-
 
   useEffect(() => {
     const storedGameData = sessionStorage.getItem("currentGameData");
-
     if (!storedGameData) {
-      setError("Could not load game data. Please try creating a new game from the dashboard.");
+      setError("Could not load game data. Please start a new game from the dashboard.");
       setIsLoading(false);
       return;
     }
 
     try {
       const parsedGameData: CustomizeGameDifficultyOutput = JSON.parse(storedGameData);
-      
-      const gameName = parsedGameData.gameType;
-      const foundGame = MOCK_GAMES.find((g) => g.name.toLowerCase() === gameName.toLowerCase());
-
-      if (!foundGame) {
-        setError("Could not find the selected game type.");
+      if (!parsedGameData.gameData || parsedGameData.gameData.length === 0) {
+        setError("The generated game is empty. Please try again.");
         setIsLoading(false);
         return;
       }
-      
-      setGame(foundGame);
-      // Difficulty might not always be in params, it's part of the generated game
-      // setDifficulty(difficultyParam);
-
-      // Safeguard for Word Puzzle games
-      if (parsedGameData.gameType && ['wordscapes', 'word cookies', 'spelling bee (nyt)'].includes(parsedGameData.gameType.toLowerCase())) {
-        const wordPuzzleData = parsedGameData.gameData as { letters: string[], mainWords: string[], bonusWords: string[], centerLetter?: string };
-        
-        if (wordPuzzleData.letters && wordPuzzleData.mainWords && wordPuzzleData.bonusWords) {
-          
-          // Filter words to ensure they are valid based on the given letters and rules
-          const validMainWords = wordPuzzleData.mainWords.filter(word => {
-              const isValid = isWordValid(word, wordPuzzleData.letters);
-              const hasCenter = !wordPuzzleData.centerLetter || word.toLowerCase().includes(wordPuzzleData.centerLetter.toLowerCase());
-              return isValid && hasCenter;
-          });
-
-          const validBonusWords = wordPuzzleData.bonusWords.filter(word => {
-              const isValid = isWordValid(word, wordPuzzleData.letters);
-              const hasCenter = !wordPuzzleData.centerLetter || word.toLowerCase().includes(wordPuzzleData.centerLetter.toLowerCase());
-              return isValid && hasCenter;
-          });
-          
-          const validMainWordsSet = new Set(validMainWords.map(w => w.toLowerCase()));
-          const uniqueBonusWords = Array.from(new Set(validBonusWords.map(w => w.toLowerCase())))
-            .filter(bw => !validMainWordsSet.has(bw));
-          
-          wordPuzzleData.mainWords = Array.from(new Set(validMainWords.map(w => w.toLowerCase())));
-          wordPuzzleData.bonusWords = uniqueBonusWords;
-          parsedGameData.gameData = wordPuzzleData;
-
-          if (wordPuzzleData.letters) {
-              setShuffledLetters([...wordPuzzleData.letters].sort(() => Math.random() - 0.5));
-          }
-        }
-      }
-
       setGameData(parsedGameData);
-
-      if (parsedGameData.gameType?.toLowerCase().includes('elevate') || parsedGameData.gameType?.toLowerCase().includes('drops')) {
-          const currentRound = (parsedGameData.gameData as any[])?.[0];
-          if (currentRound?.miniGameType === 'memory') {
-              setMemoryPhase('showing');
-              setTimeout(() => setMemoryPhase('answering'), 5000); // Show words for 5 seconds
-          }
-      }
       setIsLoading(false);
     } catch (err) {
       console.error("Failed to parse game data from sessionStorage:", err);
       setError("Failed to load the game. The data might be corrupted. Please try again.");
       setIsLoading(false);
     }
-  }, [searchParams, toast]);
-  
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
-    if (!gameData || !isWordPuzzleGame || isFinished) return;
+  }, []);
+
+  useEffect(() => {
+    if (isLoading || isFinished) return;
+    if (timeLeft > 0 && lives > 0) {
+      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
+      return () => clearTimeout(timer);
+    } else {
+      setIsFinished(true); // End game when time or lives run out
+    }
+  }, [timeLeft, lives, isLoading, isFinished]);
+
+
+  const advanceToNextRound = useCallback((delay: number) => {
+    setTimeout(() => {
+      setIsCorrect(null);
+      setUserAnswer("");
+      
+      const nextRoundIndex = currentRoundIndex + 1;
+      if (nextRoundIndex < (gameData?.gameData.length || 0)) {
+        setCurrentRoundIndex(nextRoundIndex);
+      } else {
+        setIsFinished(true); // End of rounds
+      }
+    }, delay);
+  }, [currentRoundIndex, gameData]);
+
+  const handleCorrectAnswer = useCallback((points = 10) => {
+    const streakBonus = streak * 2;
+    setScore(prev => prev + points + streakBonus);
+    setStreak(prev => prev + 1);
+    setIsCorrect(true);
+    advanceToNextRound(1200);
+  }, [streak, advanceToNextRound]);
+
+  const handleIncorrectAnswer = useCallback(() => {
+    setLives(prev => prev - 1);
+    setStreak(0);
+    setIsCorrect(false);
+    advanceToNextRound(1500);
+  }, [advanceToNextRound]);
+
+  const handleSubmitAnswer = (e: React.FormEvent | string) => {
+    if (typeof e !== 'string') e.preventDefault();
+    if (!gameData || isCorrect !== null) return;
     
-    const key = event.key.toLowerCase();
-    
-    // For spelling bee
-    if (gameData?.gameType?.toLowerCase().includes('spelling bee')) {
-        const wordPuzzleData = gameData.gameData as { letters: string[] };
-        const allowedLetters = wordPuzzleData.letters.map(l => l.toLowerCase());
-        
-        if (allowedLetters.includes(key)) {
-            setUserAnswer(prev => prev + key);
-        } else if (key === 'backspace') {
-            setUserAnswer(prev => prev.slice(0, -1));
-        } else if (key === 'enter') {
-            event.preventDefault();
-            handleSubmitAnswer('enter-key-submit');
-        }
+    const submittedAnswer = (typeof e === 'string' ? e : userAnswer).trim().toLowerCase();
+    if (!submittedAnswer) return;
+
+    const currentRound = gameData.gameData[currentRoundIndex];
+    let isAnswerCorrect = false;
+
+    switch (currentRound.miniGameType) {
+        case 'word-translation-match':
+        case 'word-image-match':
+            // These are handled by button clicks with the answer embedded
+            isAnswerCorrect = submittedAnswer === 'correct';
+            break;
+        case 'spelling-completion':
+            isAnswerCorrect = submittedAnswer === currentRound.word.toLowerCase();
+            break;
+        case 'trace-or-type':
+            isAnswerCorrect = submittedAnswer === currentRound.word.toLowerCase();
+            break;
+        case 'true-false-challenge':
+            const expected = currentRound.isCorrectMatch ? 'true' : 'false';
+            isAnswerCorrect = submittedAnswer === expected;
+            break;
     }
-  }, [gameData, isWordPuzzleGame, isFinished]);
-  
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [handleKeyDown]);
 
-
-  useEffect(() => {
-    if (!gameData || isLoading || isFinished) return;
-
-    if (isCognitiveGame) {
-        if (timeLeft > 0 && lives > 0) {
-            const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-            return () => clearTimeout(timer);
-        } else if (!isFinished) {
-            setIsFinished(true);
-        }
+    if (isAnswerCorrect) {
+        handleCorrectAnswer();
+    } else {
+        handleIncorrectAnswer();
     }
-  }, [timeLeft, lives, gameData, isLoading, isFinished, isCognitiveGame]);
-
-
-  useEffect(() => {
-    if (gameData && isWordPuzzleGame) {
-        const wordPuzzleData = gameData.gameData as { letters: string[], mainWords: string[], bonusWords: string[] };
-        if (wordPuzzleData.mainWords && wordPuzzleData.mainWords.length > 0 && foundMainWords.length === wordPuzzleData.mainWords.length) {
-            setIsFinished(true);
-        }
-    }
-  }, [foundMainWords, gameData, isWordPuzzleGame]);
-
+  };
 
   const handleGetHint = async () => {
     if (!gameData) return;
     setIsHintLoading(true);
 
-    let contextWord = "the game words";
-    if (isWordPuzzleGame) {
-        const wordPuzzleData = gameData.gameData as { mainWords: string[] };
-        const unfoundWords = wordPuzzleData.mainWords.filter(
-            w => !foundMainWords.includes(w.toLowerCase())
-        );
-        if (unfoundWords.length > 0) {
-            contextWord = `one of these words: ${unfoundWords.slice(0, 10).join(', ')}`;
-        }
-    }
-    
+    const currentRound = gameData.gameData[currentRoundIndex];
     const documentContent = sessionStorage.getItem("game_document_content") || "No context available.";
-    
+
     try {
       const result = await generateHint({
         documentContext: documentContent,
-        word: contextWord,
+        word: currentRound.word,
       });
       toast({
         title: "Hint",
@@ -464,193 +181,28 @@ function GameComponent() {
 
   const handleRevealAnswer = () => {
     if (!gameData || isCorrect !== null) return;
-    setScore((prev) => Math.max(0, prev - 25)); // Deduct points for revealing
-
-    if (isWordPuzzleGame) {
-      const wordPuzzleData = gameData.gameData as { letters: string[], mainWords: string[], bonusWords: string[] };
-      const unfoundWord = wordPuzzleData.mainWords.find(
-        (word) => !foundMainWords.includes(word.toLowerCase())
-      );
-      if (unfoundWord) {
-        setFoundMainWords((prev) => [...prev, unfoundWord.toLowerCase()]);
-        toast({
-          title: "Answer Revealed!",
-          description: `The word was: ${unfoundWord.toUpperCase()}`,
-        });
-      } else {
-        toast({
-          title: "No more words to reveal!",
-          description: "You've found them all.",
-        });
-      }
-    } else if (isCognitiveGame) {
-      const currentRound = (gameData.gameData as any[])[currentRoundIndex];
-      let correctAnswer: string;
-      switch (currentRound.miniGameType) {
-        case 'unscramble':
-          correctAnswer = currentRound.word;
-          break;
-        case 'true-false':
-          correctAnswer = String(currentRound.isTrue);
-          break;
-        default:
-          correctAnswer = currentRound.correctAnswer;
-          break;
-      }
-      toast({
-          title: "Answer Revealed!",
-          description: `The correct answer was: ${correctAnswer}`,
-      });
-      setIsCorrect(false); // Mark as incorrect for progression
-      advanceToNextRound(1500);
-    }
-  };
-
-
-  const advanceToNextRound = useCallback((delay: number) => {
-    setTimeout(() => {
-        setIsCorrect(null);
-        setUserAnswer("");
-        
-        if (isCognitiveGame) {
-            const cognitiveGameData = gameData?.gameData as any[];
-            const nextRoundIndex = currentRoundIndex + 1;
-
-            if (nextRoundIndex < cognitiveGameData.length) {
-                setCurrentRoundIndex(nextRoundIndex);
-                const nextRound = cognitiveGameData[nextRoundIndex];
-                if (nextRound.miniGameType === 'memory') {
-                    setMemoryPhase('showing');
-                    setTimeout(() => setMemoryPhase('answering'), 5000); // Show words for 5 seconds
-                }
-            } else {
-                setIsFinished(true);
-            }
-        }
-    }, delay);
-  }, [currentRoundIndex, gameData, isCognitiveGame]);
-
-  const handleCorrectAnswer = useCallback(() => {
-    const points = 10 + streak * 2;
-    setScore(prev => prev + points);
-    setStreak(prev => prev + 1);
-    setIsCorrect(true);
-    advanceToNextRound(1200);
-  }, [streak, advanceToNextRound]);
-
-  const handleIncorrectAnswer = useCallback(() => {
-    setLives(prev => {
-        const newLives = prev - 1;
-        if (newLives <= 0) {
-            setIsFinished(true);
-        }
-        return newLives;
-    });
-    setStreak(0);
-    setIsCorrect(false);
-    advanceToNextRound(1200);
-  }, [advanceToNextRound]);
-
-
-  const handleSubmitAnswer = (e: React.FormEvent | string) => {
-    if (typeof e !== 'string') e.preventDefault();
-    if (!gameData || isCorrect !== null) return;
+    let correctAnswer = 'N/A';
+    const currentRound = gameData.gameData[currentRoundIndex];
     
-    const submittedAnswer = (typeof e === 'string' && e !== 'enter-key-submit' ? e : userAnswer).trim().toLowerCase();
-    if (!submittedAnswer) return;
-
-    if (isWordPuzzleGame) {
-        const wordPuzzleData = gameData.gameData as { letters: string[], mainWords: string[], bonusWords: string[], centerLetter?: string };
-        
-        // Final client-side check for validity
-        if (!isWordValid(submittedAnswer, wordPuzzleData.letters)) {
-            setLastSubmissionStatus('invalid');
-            setUserAnswer("");
-            setTimeout(() => setLastSubmissionStatus(null), 1500);
-            return;
-        }
-
-        // Spelling Bee specific check
-        if (wordPuzzleData.centerLetter && !submittedAnswer.includes(wordPuzzleData.centerLetter.toLowerCase())) {
-             setLastSubmissionStatus('invalid');
-             toast({ title: `Word must contain the letter '${wordPuzzleData.centerLetter.toUpperCase()}'`, variant: 'destructive' });
-             setUserAnswer("");
-             setTimeout(() => setLastSubmissionStatus(null), 1500);
-             return;
-        }
-
-        const isMainWord = wordPuzzleData.mainWords.map(w => w.toLowerCase()).includes(submittedAnswer);
-        const isBonusWord = wordPuzzleData.bonusWords.map(w => w.toLowerCase()).includes(submittedAnswer);
-
-        if (isMainWord) {
-            if (foundMainWords.includes(submittedAnswer)) {
-                setLastSubmissionStatus('duplicate');
-            } else {
-                setLastSubmissionStatus('correct');
-                setFoundMainWords(prev => [...prev, submittedAnswer]);
-                setScore(prev => prev + submittedAnswer.length * 10);
-            }
-        } else if (isBonusWord) {
-             if (foundBonusWords.includes(submittedAnswer)) {
-                setLastSubmissionStatus('duplicate');
-            } else {
-                setLastSubmissionStatus('bonus');
-                setFoundBonusWords(prev => [...prev, submittedAnswer]);
-                setScore(prev => prev + 5);
-            }
-        } else {
-            setLastSubmissionStatus('invalid');
-        }
-        setUserAnswer("");
-        setTimeout(() => setLastSubmissionStatus(null), 1500);
-
-    } else { // Logic for Drops/Elevate and other sequential games
-        const currentRound = (gameData.gameData as any[])[currentRoundIndex];
-        let correct = false;
-
-        switch (currentRound.miniGameType) {
-            case 'unscramble':
-                correct = submittedAnswer === currentRound.word.toLowerCase();
-                break;
-            case 'multiple-choice':
-            case 'categorization':
-            case 'memory':
-                correct = submittedAnswer === currentRound.correctAnswer.toLowerCase();
-                break;
-            case 'true-false':
-                correct = (submittedAnswer === 'true') === currentRound.isTrue;
-                break;
-        }
-
-        if (correct) {
-            handleCorrectAnswer();
-        } else {
-            handleIncorrectAnswer();
-        }
+    switch(currentRound.miniGameType) {
+        case 'word-translation-match': correctAnswer = currentRound.correctTranslation; break;
+        case 'word-image-match': correctAnswer = currentRound.word; break;
+        case 'spelling-completion': correctAnswer = currentRound.word; break;
+        case 'trace-or-type': correctAnswer = currentRound.word; break;
+        case 'true-false-challenge': correctAnswer = `The statement was ${currentRound.isCorrectMatch}`; break;
     }
-  };
 
-  const getSubmissionFeedback = () => {
-    switch (lastSubmissionStatus) {
-      case 'correct':
-        return <p className="text-green-500 font-bold">Correct!</p>;
-      case 'bonus':
-        return <p className="text-blue-500 font-bold">Bonus Word!</p>;
-      case 'duplicate':
-        return <p className="text-yellow-500 font-bold">Already found!</p>;
-      case 'invalid':
-        return <p className="text-red-500 font-bold">Invalid word</p>;
-      default:
-        return <p className="h-6">&nbsp;</p>; // Placeholder for alignment
-    }
+    toast({
+      title: 'Answer Revealed',
+      description: `The correct answer was: ${correctAnswer}`,
+    });
+    handleIncorrectAnswer(); // Treat revealing as an incorrect answer
   };
-
 
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
-        <p className="ml-4 text-lg">Loading your game...</p>
       </div>
     );
   }
@@ -659,57 +211,31 @@ function GameComponent() {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
         <Alert variant="destructive" className="max-w-md">
-          <AlertTitle>Error</AlertTitle>
+          <AlertTitle>Error Loading Game</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
           <Button onClick={() => router.push("/dashboard")} className="mt-4">
-            Go to Dashboard
+            Back to Dashboard
           </Button>
         </Alert>
       </div>
     );
   }
   
-  if (isFinished) {
-    const isPuzzle = isWordPuzzleGame;
-    const totalWords = isPuzzle 
-      ? ((gameData?.gameData as any).mainWords?.length || 1)
-      : ((gameData?.gameData as any)?.length || 1);
-    
-    const finalScoreText = isPuzzle ? score : `${score} points`;
-
-    const completionMessage = () => {
-        if (isPuzzle) {
-            return `Main words found: ${foundMainWords.length} / ${totalWords}`;
-        }
-        if (lives <= 0) {
-            return "You ran out of lives!";
-        }
-        if (timeLeft <= 0) {
-            return "Time's up!";
-        }
-        return `You completed all the questions!`;
-    };
-
+  if (isFinished || !gameData) {
+    const finalMessage = lives <= 0 ? "You ran out of lives!" : timeLeft <= 0 ? "Time's up!" : "Congratulations!";
     return (
         <div className="flex min-h-screen items-center justify-center p-4">
             <Card className="w-full max-w-md text-center">
                 <CardHeader>
-                    <CardTitle className="font-headline text-3xl">Game Over!</CardTitle>
-                    <CardDescription>{completionMessage()}</CardDescription>
+                    <CardTitle className="font-headline text-3xl">Session Complete!</CardTitle>
+                    <CardDescription>{finalMessage}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <p className="text-xl">Your final score is:</p>
-                    <p className="text-5xl font-bold text-primary my-4">{finalScoreText}</p>
-                    {isPuzzle && (
-                        <div className="text-sm text-muted-foreground">
-                            <p>Bonus words found: {foundBonusWords.length}</p>
-                        </div>
-                    )}
-                     {isCognitiveGame && (
-                        <div className="text-sm text-muted-foreground">
-                             <p>Rounds completed: {currentRoundIndex} / {totalWords}</p>
-                        </div>
-                    )}
+                    <p className="text-5xl font-bold text-primary my-4">{score}</p>
+                    <div className="text-sm text-muted-foreground">
+                        <p>Rounds completed: {currentRoundIndex} / {gameData?.gameData.length}</p>
+                    </div>
                 </CardContent>
                 <CardFooter>
                     <Button onClick={() => router.push('/dashboard')} className="w-full">
@@ -721,242 +247,124 @@ function GameComponent() {
     )
   }
 
-  const renderGameHeader = () => {
-    return (
-      <CardHeader>
-          <div className="flex justify-between items-start">
-            <div>
-              <CardTitle className="font-headline text-3xl">{game?.name}</CardTitle>
-              <CardDescription>{gameData?.gameTitle}</CardDescription>
-            </div>
-            {isCognitiveGame ? (
-                 <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-1.5 text-rose-500 font-semibold">
-                         <Heart className="w-5 h-5"/>
-                         <span>{lives}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-muted-foreground font-semibold">
-                        <Timer className="w-5 h-5"/>
-                        <span>{Math.floor(timeLeft / 60)}:{('0' + timeLeft % 60).slice(-2)}</span>
-                    </div>
-                </div>
-            ) : (
-                <Badge variant="secondary" className="capitalize">
-                    {difficulty}
-                </Badge>
-            )}
+  const currentRound = gameData.gameData[currentRoundIndex];
+  const progressValue = ((currentRoundIndex + 1) / gameData.gameData.length) * 100;
+
+  const renderGameHeader = () => (
+    <CardHeader>
+        <div className="flex justify-between items-center">
+          <div>
+            <CardTitle className="font-headline text-3xl">{gameData.gameTitle}</CardTitle>
+            <CardDescription>A 5-minute learning burst!</CardDescription>
           </div>
-           {isWordPuzzleGame ? (
-               <Progress value={(foundMainWords.length / ((gameData?.gameData as any).mainWords.length || 1)) * 100} className="mt-4" />
-           ) : (
-                <Progress value={((currentRoundIndex + 1) / ((gameData?.gameData as any)?.length || 1)) * 100} className="mt-4" />
-           )}
-      </CardHeader>
-    )
-  };
+          <div className="flex items-center gap-4 text-lg">
+             <div className="flex items-center gap-1.5 text-rose-500 font-semibold">
+                  <Heart className="w-6 h-6"/>
+                  <span>{lives}</span>
+             </div>
+             <div className="flex items-center gap-1.5 text-muted-foreground font-semibold">
+                 <Timer className="w-6 h-6"/>
+                 <span>{Math.floor(timeLeft / 60)}:{('0' + timeLeft % 60).slice(-2)}</span>
+             </div>
+          </div>
+        </div>
+        <Progress value={progressValue} className="mt-4 h-2" />
+    </CardHeader>
+  );
 
   const renderCurrentRound = () => {
-    if (!gameData || isWordPuzzleGame) return null;
-
-    const currentRound = (gameData.gameData as any[])[currentRoundIndex];
-    if (!currentRound) return null;
-
-    const getFeedbackRingColor = () => {
-        if (isCorrect === true) return "ring-green-500";
-        if (isCorrect === false) return "ring-red-500";
-        return "ring-transparent";
-    }
-
+    const feedbackClass = isCorrect === true ? 'ring-green-500' : isCorrect === false ? 'ring-red-500' : 'ring-transparent';
+    
     return (
-        <CardContent className={cn("text-center transition-all duration-300 min-h-[300px] flex flex-col justify-center", getFeedbackRingColor())}>
-            <div className={`p-4 rounded-lg ring-4 ${getFeedbackRingColor()}`}>
-            {currentRound.miniGameType === 'unscramble' && (
-                <>
-                    <p className="text-muted-foreground mb-2">{currentRound.displayPrompt}</p>
-                    <p className="text-4xl font-bold tracking-widest uppercase my-8">
-                        {currentRound.scrambled}
-                    </p>
-                    <form onSubmit={handleSubmitAnswer}>
-                        <Input
-                            type="text"
-                            placeholder="Type your answer..."
-                            value={userAnswer}
-                            onChange={(e) => setUserAnswer(e.target.value)}
-                            className="text-center text-lg h-12 max-w-sm mx-auto"
-                            disabled={isCorrect !== null}
-                        />
-                        <Button type="submit" className="mt-4 w-full max-w-sm" disabled={isCorrect !== null}>
-                            Submit
+        <CardContent className={cn("min-h-[350px] flex flex-col items-center justify-center p-4 transition-all", feedbackClass)}>
+            <div className={cn("w-full text-center p-4 rounded-lg ring-4 transition-all", feedbackClass)}>
+                <p className="font-semibold text-lg mb-4">{currentRound.displayPrompt}</p>
+
+                {currentRound.miniGameType === 'word-image-match' && (
+                    <div className="grid grid-cols-2 gap-4">
+                        <Button variant="outline" className="h-auto p-2 flex flex-col gap-2" onClick={() => handleSubmitAnswer('correct')} disabled={isCorrect !== null}>
+                            <Image src={currentRound.correctImageDataUri} alt={currentRound.word} width={150} height={150} className="rounded-md" data-ai-hint="object concept"/>
+                            {currentRound.word}
                         </Button>
-                    </form>
-                </>
-            )}
-            {(currentRound.miniGameType === 'multiple-choice' || currentRound.miniGameType === 'categorization') && (
-                <>
-                    <p className="text-lg font-semibold mb-6">{currentRound.question}</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {currentRound.options.map((option: string) => (
-                            <Button
-                                key={option}
-                                variant="outline"
-                                className="h-auto py-4 text-base"
-                                onClick={() => handleSubmitAnswer(option)}
-                                disabled={isCorrect !== null}
-                            >
-                                {option}
+                        {currentRound.distractorWords.map(word => (
+                            <Button key={word} variant="outline" className="h-auto p-2 flex flex-col gap-2" onClick={() => handleSubmitAnswer('incorrect')} disabled={isCorrect !== null}>
+                                <Image src={`https://placehold.co/150x150.png`} alt={word} width={150} height={150} className="rounded-md" data-ai-hint="object concept"/>
+                                {word}
                             </Button>
                         ))}
                     </div>
-                </>
-            )}
-            {currentRound.miniGameType === 'true-false' && (
-                <>
-                    <p className="text-lg font-semibold mb-6">{currentRound.statement}</p>
-                    <div className="flex justify-center gap-4">
-                        <Button
-                            variant="outline"
-                            className="h-16 w-32 text-lg bg-green-50 hover:bg-green-100 text-green-800"
-                            onClick={() => handleSubmitAnswer("true")}
-                            disabled={isCorrect !== null}
-                        >
-                            <Check className="mr-2"/> True
-                        </Button>
-                        <Button
-                            variant="outline"
-                            className="h-16 w-32 text-lg bg-red-50 hover:bg-red-100 text-red-800"
-                             onClick={() => handleSubmitAnswer("false")}
-                             disabled={isCorrect !== null}
-                        >
-                            <X className="mr-2"/> False
-                        </Button>
+                )}
+
+                {currentRound.miniGameType === 'word-translation-match' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {[currentRound.correctTranslation, ...currentRound.distractorTranslations].sort(() => Math.random() - 0.5).map(translation => (
+                            <Button key={translation} variant="outline" className="h-16 text-base" onClick={() => handleSubmitAnswer(translation === currentRound.correctTranslation ? 'correct' : 'incorrect')} disabled={isCorrect !== null}>
+                                {translation}
+                            </Button>
+                        ))}
                     </div>
-                </>
-            )}
-            {currentRound.miniGameType === 'memory' && (
-                <>
-                    {memoryPhase === 'showing' ? (
-                        <div className="flex flex-col items-center animate-pulse">
-                            <BrainCircuit className="w-16 h-16 text-primary mb-4"/>
-                            <p className="text-lg font-semibold mb-2">Memorize these words!</p>
-                            <div className="flex flex-wrap justify-center gap-2 p-4 rounded-lg bg-muted/50">
-                                {currentRound.wordsToShow.map((word: string) => (
-                                    <Badge key={word} variant="secondary" className="text-lg">{word}</Badge>
-                                ))}
-                            </div>
+                )}
+                
+                {(currentRound.miniGameType === 'spelling-completion' || currentRound.miniGameType === 'trace-or-type') && (
+                    <>
+                        <p className="text-4xl font-bold tracking-widest my-8 uppercase">{currentRound.miniGameType === 'spelling-completion' ? currentRound.promptWord : currentRound.word}</p>
+                        <form onSubmit={(e) => handleSubmitAnswer(e)} className="flex flex-col items-center gap-4">
+                            <Input
+                                value={userAnswer}
+                                onChange={(e) => setUserAnswer(e.target.value)}
+                                placeholder="Type the full word..."
+                                className="text-center text-lg h-12 max-w-sm"
+                                disabled={isCorrect !== null}
+                                autoFocus
+                            />
+                            <Button type="submit" className="w-full max-w-sm" disabled={isCorrect !== null}>Submit</Button>
+                        </form>
+                    </>
+                )}
+                
+                {currentRound.miniGameType === 'true-false-challenge' && (
+                    <div className="flex flex-col items-center gap-6">
+                        <Card className="p-4">
+                            <p className="text-2xl font-bold">{currentRound.word}</p>
+                            <p className="text-muted-foreground">is</p>
+                            <p className="text-2xl font-bold">{currentRound.imageOrTranslation}</p>
+                        </Card>
+                        <div className="flex gap-4">
+                            <Button className="h-16 w-32 text-lg bg-green-100 hover:bg-green-200 text-green-800" onClick={() => handleSubmitAnswer('true')} disabled={isCorrect !== null}>
+                                <Check className="mr-2"/> True
+                            </Button>
+                            <Button className="h-16 w-32 text-lg bg-red-100 hover:bg-red-200 text-red-800" onClick={() => handleSubmitAnswer('false')} disabled={isCorrect !== null}>
+                                <X className="mr-2"/> False
+                            </Button>
                         </div>
-                    ) : (
-                        <div>
-                             <p className="text-lg font-semibold mb-6">{currentRound.question}</p>
-                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {currentRound.options.map((option: string) => (
-                                    <Button
-                                        key={option}
-                                        variant="outline"
-                                        className="h-auto py-4 text-base"
-                                        onClick={() => handleSubmitAnswer(option)}
-                                        disabled={isCorrect !== null}
-                                    >
-                                        {option}
-                                    </Button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </>
-            )}
+                    </div>
+                )}
             </div>
         </CardContent>
     );
-};
-  
-  const renderWordPuzzleGame = () => {
-    if (!gameData || !isWordPuzzleGame) return null;
-    
-    const isWordscapes = gameData.gameType?.toLowerCase().includes('wordscapes');
-    const isSpellingBee = gameData.gameType?.toLowerCase().includes('spelling bee');
-    const wordPuzzleData = gameData.gameData as { letters: string[], mainWords: string[], bonusWords: string[], centerLetter?: string };
-
-    return (
-        <CardContent className="flex flex-col items-center">
-            {isWordscapes ? (
-                <WordGrid words={wordPuzzleData.mainWords} foundWords={foundMainWords}/>
-            ) : (
-                <WordCollection words={[...wordPuzzleData.mainWords, ...wordPuzzleData.bonusWords]} foundWords={[...foundMainWords, ...foundBonusWords]} />
-            )}
-
-            <div className="h-6 my-2">
-              {getSubmissionFeedback()}
-            </div>
-
-            {isSpellingBee ? (
-                <div className="text-2xl font-bold tracking-widest uppercase h-10 flex items-center justify-center bg-background border-b-2 w-48 text-center mb-4">
-                    {userAnswer}
-                </div>
-            ) : (
-                <div className="text-2xl font-bold tracking-widest uppercase h-10 flex items-center justify-center bg-background border-b-2 w-48 text-center">
-                    {userAnswer}
-                </div>
-            )}
-
-            {isSpellingBee && wordPuzzleData.centerLetter ? (
-                 <Honeycomb
-                    letters={shuffledLetters}
-                    centerLetter={wordPuzzleData.centerLetter}
-                    onLetterClick={(letter) => setUserAnswer(prev => prev + letter)}
-                    onShuffle={() => setShuffledLetters([...wordPuzzleData.letters].sort(() => Math.random() - 0.5))}
-                />
-            ) : (
-                <LetterWheel letters={wordPuzzleData.letters} onWordChange={setUserAnswer} />
-            )}
-
-
-            {isSpellingBee ? (
-                 <form onSubmit={(e) => handleSubmitAnswer(e)} className="w-full flex items-center justify-center gap-2">
-                     <Button type="button" variant="outline" onClick={() => setUserAnswer(prev => prev.slice(0, -1))}>Delete</Button>
-                     <Button type="submit" className="w-48" disabled={!userAnswer || lastSubmissionStatus !== null}>
-                        <Send className="mr-2" /> Enter
-                    </Button>
-                 </form>
-            ): (
-                 <form onSubmit={(e) => handleSubmitAnswer(e)} className="w-full flex items-center justify-center gap-2">
-                     <Button type="submit" className="w-48" disabled={!userAnswer || lastSubmissionStatus !== null}>
-                        <Send className="mr-2" /> Submit
-                    </Button>
-                </form>
-            )}
-        </CardContent>
-    )
-  }
+  };
 
   return (
-    <div className="container mx-auto max-w-3xl py-8">
+    <div className="container mx-auto max-w-2xl py-8">
       <Button variant="ghost" onClick={() => router.push("/dashboard")} className="mb-4">
         <ChevronLeft className="mr-2 h-4 w-4" />
         Back to Library
       </Button>
       <Card>
         {renderGameHeader()}
-        
-        {isCognitiveGame ? renderCurrentRound() : renderWordPuzzleGame()}
-        
+        {renderCurrentRound()}
         <CardFooter className="flex justify-between items-center">
-            <div className="flex-1">
-                 <p className="text-sm text-muted-foreground">Score: {score}</p>
-                 {isWordPuzzleGame ? (
-                     <p className="text-sm text-muted-foreground flex items-center gap-1">
-                        <Star className="w-3 h-3 text-yellow-500"/> Bonus Words: {foundBonusWords.length}
-                    </p>
-                 ) : (
-                     <p className="text-sm text-muted-foreground">Streak: {streak}x</p>
-                 )}
+            <div className="flex items-center gap-2">
+                 <p className="text-sm text-muted-foreground">Score: <span className="font-bold">{score}</span></p>
+                 <p className="text-sm text-muted-foreground flex items-center">
+                    Streak: <span className="font-bold ml-1">{streak}x</span> <Sparkles className="w-4 h-4 ml-1 text-yellow-500"/>
+                 </p>
             </div>
              <div className="flex items-center gap-2">
-                {(isWordPuzzleGame || isCognitiveGame) && (
-                  <Button variant="outline" size="sm" onClick={handleRevealAnswer} disabled={isFinished || isCorrect !== null}>
-                    <Eye className="mr-2 h-4 w-4" /> Reveal Answer
-                  </Button>
-                )}
-                <Button variant="outline" size="sm" onClick={handleGetHint} disabled={isHintLoading || isFinished}>
+                <Button variant="outline" size="sm" onClick={handleRevealAnswer} disabled={isCorrect !== null}>
+                    <Eye className="mr-2 h-4 w-4" /> Reveal
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleGetHint} disabled={isHintLoading || isCorrect !== null}>
                     {isHintLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Lightbulb className="mr-2 h-4 w-4"/>}
                     Hint
                 </Button>
@@ -969,11 +377,10 @@ function GameComponent() {
 
 export default function GamePage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-16 w-16 animate-spin text-primary" />
-        <p className="ml-4 text-lg">Loading...</p>
-      </div>}>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><Loader2 className="h-16 w-16 animate-spin text-primary" /></div>}>
       <GameComponent />
     </Suspense>
   );
 }
+
+    

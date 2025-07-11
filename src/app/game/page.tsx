@@ -43,6 +43,65 @@ import {
 import type { Game } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+// --- Spelling Bee Components ---
+const Honeycomb = ({
+  letters,
+  centerLetter,
+  onLetterClick,
+  onShuffle,
+}: {
+  letters: string[];
+  centerLetter: string;
+  onLetterClick: (letter: string) => void;
+  onShuffle: () => void;
+}) => {
+  const outerLetters = letters.filter((l) => l !== centerLetter);
+
+  const positions = [
+    { top: '0%', left: '50%' },     // Top
+    { top: '25%', left: '93.3%' }, // Top-right
+    { top: '75%', left: '93.3%' }, // Bottom-right
+    { top: '100%', left: '50%' },   // Bottom
+    { top: '75%', left: '6.7%' },  // Bottom-left
+    { top: '25%', left: '6.7%' },   // Top-left
+  ];
+
+  return (
+    <div className="flex flex-col items-center gap-4 my-8">
+      <div className="relative h-48 w-48 sm:h-56 sm:w-56">
+        {/* Center Letter */}
+        <button
+          onClick={() => onLetterClick(centerLetter)}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center w-[33.33%] h-[33.33%] bg-primary text-primary-foreground font-bold uppercase text-2xl"
+          style={{ clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' }}
+        >
+          {centerLetter}
+        </button>
+        {/* Outer Letters */}
+        {outerLetters.map((letter, index) => (
+          <button
+            key={letter}
+            onClick={() => onLetterClick(letter)}
+            className="absolute flex items-center justify-center w-[33.33%] h-[33.33%] bg-card hover:bg-muted font-bold uppercase text-2xl"
+            style={{
+              clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
+              transform: 'translate(-50%, -50%)',
+              ...positions[index],
+            }}
+          >
+            {letter}
+          </button>
+        ))}
+      </div>
+      <Button onClick={onShuffle} variant="ghost" size="icon">
+        <RefreshCw className="h-5 w-5" />
+        <span className="sr-only">Shuffle</span>
+      </Button>
+    </div>
+  );
+};
+
+
 // --- Wordscapes Components ---
 
 const LetterWheel = ({
@@ -124,7 +183,7 @@ const LetterWheel = ({
 
 const WordGrid = ({ words, foundWords }: { words: string[], foundWords: string[] }) => {
     // Sort words by length for a typical puzzle feel
-    const sortedWords = [...words].sort((a, b) => a.length - b.length);
+    const sortedWords = useMemo(() => [...words].sort((a, b) => a.length - b.length), [words]);
 
     return (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-2 my-4 p-4 bg-muted/50 rounded-lg">
@@ -223,7 +282,8 @@ function GameComponent() {
   const [isHintLoading, setIsHintLoading] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
 
-  // Wordscapes/Word Cookies specific state
+  // Wordscapes/Word Cookies/Spelling Bee specific state
+  const [shuffledLetters, setShuffledLetters] = useState<string[]>([]);
   const [foundMainWords, setFoundMainWords] = useState<string[]>([]);
   const [foundBonusWords, setFoundBonusWords] = useState<string[]>([]);
   const [lastSubmissionStatus, setLastSubmissionStatus] = useState<'correct' | 'bonus' | 'invalid' | 'duplicate' | null>(null);
@@ -272,20 +332,35 @@ function GameComponent() {
 
         // Safeguard for Word Puzzle games
         if (result.gameType && ['wordscapes', 'word cookies', 'spelling bee (nyt)'].includes(result.gameType.toLowerCase())) {
-          const wordPuzzleData = result.gameData as { letters: string[], mainWords: string[], bonusWords: string[] };
+          const wordPuzzleData = result.gameData as { letters: string[], mainWords: string[], bonusWords: string[], centerLetter?: string };
           
           if (wordPuzzleData.letters && wordPuzzleData.mainWords && wordPuzzleData.bonusWords) {
-            // Filter words to ensure they are valid based on the given letters
-            const validMainWords = wordPuzzleData.mainWords.filter(word => isWordValid(word, wordPuzzleData.letters));
-            const validBonusWords = wordPuzzleData.bonusWords.filter(word => isWordValid(word, wordPuzzleData.letters));
             
-            const mainWordsSet = new Set(validMainWords.map(w => w.toLowerCase()));
+            const mainWordsSet = new Set(wordPuzzleData.mainWords.map(w => w.toLowerCase()));
+
+            // Filter words to ensure they are valid based on the given letters and rules
+            const validMainWords = wordPuzzleData.mainWords.filter(word => {
+                const isValid = isWordValid(word, wordPuzzleData.letters);
+                const hasCenter = !wordPuzzleData.centerLetter || word.toLowerCase().includes(wordPuzzleData.centerLetter.toLowerCase());
+                return isValid && hasCenter;
+            });
+            const validBonusWords = wordPuzzleData.bonusWords.filter(word => {
+                const isValid = isWordValid(word, wordPuzzleData.letters);
+                const hasCenter = !wordPuzzleData.centerLetter || word.toLowerCase().includes(wordPuzzleData.centerLetter.toLowerCase());
+                return isValid && hasCenter;
+            });
+            
+            const validMainWordsSet = new Set(validMainWords.map(w => w.toLowerCase()));
             const uniqueBonusWords = Array.from(new Set(validBonusWords.map(w => w.toLowerCase())))
-              .filter(bw => !mainWordsSet.has(bw));
+              .filter(bw => !validMainWordsSet.has(bw));
             
             wordPuzzleData.mainWords = validMainWords;
             wordPuzzleData.bonusWords = uniqueBonusWords;
             result.gameData = wordPuzzleData;
+
+            if (wordPuzzleData.letters) {
+                setShuffledLetters([...wordPuzzleData.letters].sort(() => Math.random() - 0.5));
+            }
           }
         }
 
@@ -461,7 +536,7 @@ function GameComponent() {
     if (!submittedAnswer) return;
 
     if (isWordPuzzleGame) {
-        const wordPuzzleData = gameData.gameData as { letters: string[], mainWords: string[], bonusWords: string[] };
+        const wordPuzzleData = gameData.gameData as { letters: string[], mainWords: string[], bonusWords: string[], centerLetter?: string };
         
         // Final client-side check for validity
         if (!isWordValid(submittedAnswer, wordPuzzleData.letters)) {
@@ -469,6 +544,15 @@ function GameComponent() {
             setUserAnswer("");
             setTimeout(() => setLastSubmissionStatus(null), 1500);
             return;
+        }
+
+        // Spelling Bee specific check
+        if (wordPuzzleData.centerLetter && !submittedAnswer.includes(wordPuzzleData.centerLetter.toLowerCase())) {
+             setLastSubmissionStatus('invalid');
+             toast({ title: `Word must contain the letter '${wordPuzzleData.centerLetter.toUpperCase()}'`, variant: 'destructive' });
+             setUserAnswer("");
+             setTimeout(() => setLastSubmissionStatus(null), 1500);
+             return;
         }
 
         const isMainWord = wordPuzzleData.mainWords.map(w => w.toLowerCase()).includes(submittedAnswer);
@@ -599,7 +683,7 @@ function GameComponent() {
                     )}
                      {isCognitiveGame && (
                         <div className="text-sm text-muted-foreground">
-                             <p>Rounds completed: {currentRoundIndex + 1} / {totalWords}</p>
+                             <p>Rounds completed: {currentRoundIndex} / {totalWords}</p>
                         </div>
                     )}
                 </CardContent>
@@ -683,7 +767,7 @@ function GameComponent() {
                     </form>
                 </>
             )}
-            {currentRound.miniGameType === 'multiple-choice' && (
+            {(currentRound.miniGameType === 'multiple-choice' || currentRound.miniGameType === 'categorization') && (
                 <>
                     <p className="text-lg font-semibold mb-6">{currentRound.question}</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -756,24 +840,6 @@ function GameComponent() {
                     )}
                 </>
             )}
-            {currentRound.miniGameType === 'categorization' && (
-                 <>
-                    <p className="text-lg font-semibold mb-6">{currentRound.question}</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {currentRound.options.map((option: string) => (
-                            <Button
-                                key={option}
-                                variant="outline"
-                                className="h-auto py-4 text-base"
-                                onClick={() => handleSubmitAnswer(option)}
-                                disabled={isCorrect !== null}
-                            >
-                                {option}
-                            </Button>
-                        ))}
-                    </div>
-                </>
-            )}
             </div>
         </CardContent>
     );
@@ -783,30 +849,57 @@ function GameComponent() {
     if (!gameData || !isWordPuzzleGame) return null;
     
     const isWordscapes = gameData.gameType?.toLowerCase().includes('wordscapes');
-    const wordPuzzleData = gameData.gameData as { letters: string[], mainWords: string[], bonusWords: string[] };
+    const isSpellingBee = gameData.gameType?.toLowerCase().includes('spelling bee');
+    const wordPuzzleData = gameData.gameData as { letters: string[], mainWords: string[], bonusWords: string[], centerLetter?: string };
 
     return (
         <CardContent className="flex flex-col items-center">
             {isWordscapes ? (
                 <WordGrid words={wordPuzzleData.mainWords} foundWords={foundMainWords}/>
             ) : (
-                <WordCollection words={wordPuzzleData.mainWords} foundWords={foundMainWords} />
+                <WordCollection words={[...wordPuzzleData.mainWords, ...wordPuzzleData.bonusWords]} foundWords={[...foundMainWords, ...foundBonusWords]} />
             )}
 
             <div className="h-6 my-2">
               {getSubmissionFeedback()}
             </div>
-            <div className="text-2xl font-bold tracking-widest uppercase h-10 flex items-center justify-center bg-background border-b-2 w-48 text-center">
-                {userAnswer}
-            </div>
 
-            <LetterWheel letters={wordPuzzleData.letters} onWordChange={setUserAnswer} />
+            {isSpellingBee ? (
+                <div className="text-2xl font-bold tracking-widest uppercase h-10 flex items-center justify-center bg-background border-b-2 w-48 text-center mb-4">
+                    {userAnswer}
+                </div>
+            ) : (
+                <div className="text-2xl font-bold tracking-widest uppercase h-10 flex items-center justify-center bg-background border-b-2 w-48 text-center">
+                    {userAnswer}
+                </div>
+            )}
 
-            <form onSubmit={handleSubmitAnswer} className="w-full flex items-center justify-center gap-2">
-                 <Button type="submit" className="w-48" disabled={!userAnswer || lastSubmissionStatus !== null}>
-                    <Send className="mr-2" /> Submit
-                </Button>
-            </form>
+            {isSpellingBee && wordPuzzleData.centerLetter ? (
+                 <Honeycomb
+                    letters={shuffledLetters}
+                    centerLetter={wordPuzzleData.centerLetter}
+                    onLetterClick={(letter) => setUserAnswer(prev => prev + letter)}
+                    onShuffle={() => setShuffledLetters([...wordPuzzleData.letters].sort(() => Math.random() - 0.5))}
+                />
+            ) : (
+                <LetterWheel letters={wordPuzzleData.letters} onWordChange={setUserAnswer} />
+            )}
+
+
+            {isSpellingBee ? (
+                 <form onSubmit={handleSubmitAnswer} className="w-full flex items-center justify-center gap-2">
+                     <Button type="button" variant="outline" onClick={() => setUserAnswer(prev => prev.slice(0, -1))}>Delete</Button>
+                     <Button type="submit" className="w-48" disabled={!userAnswer || lastSubmissionStatus !== null}>
+                        <Send className="mr-2" /> Enter
+                    </Button>
+                 </form>
+            ): (
+                 <form onSubmit={handleSubmitAnswer} className="w-full flex items-center justify-center gap-2">
+                     <Button type="submit" className="w-48" disabled={!userAnswer || lastSubmissionStatus !== null}>
+                        <Send className="mr-2" /> Submit
+                    </Button>
+                </form>
+            )}
         </CardContent>
     )
   }
@@ -857,5 +950,3 @@ export default function GamePage() {
     </Suspense>
   );
 }
-
-    

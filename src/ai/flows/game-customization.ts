@@ -29,6 +29,14 @@ const WordscapesRoundSchema = z.object({
     bonusWords: z.array(z.string()).describe('An additional list of valid, real English words (3+ letters) that can be formed but are not in the main grid. This list must not contain any words from mainWords. Every word in this list MUST be formable using only the provided letters.'),
 });
 
+const SpellingBeeRoundSchema = z.object({
+    letters: z.array(z.string()).length(7).describe('An array of exactly 7 letters for the user to form words from.'),
+    centerLetter: z.string().length(1).describe('The mandatory center letter that must be included in every word.'),
+    mainWords: z.array(z.string()).describe('A list of primary words (4+ letters) for the user to find. Every word MUST be a valid, real English word, be at least 4 letters long, MUST be formable using only the provided 7 letters, and MUST include the centerLetter.'),
+    bonusWords: z.array(z.string()).describe('An additional list of valid, real English words that meet all the criteria but are not part of the main list. This list must not contain any words from mainWords.'),
+});
+
+
 const SimpleGameRoundSchema = z.object({
     miniGameType: z.enum(['unscramble']).describe("The type of this mini-game round."),
     word: z.string().describe('The correct word for the round.'),
@@ -70,7 +78,7 @@ const GameRoundSchema = z.union([SimpleGameRoundSchema, MultipleChoiceRoundSchem
 const CustomizeGameDifficultyOutputSchema = z.object({
     gameTitle: z.string().describe('The title for this specific game session.'),
     gameType: z.string().describe('The type of game being played, to be passed to the client.'),
-    gameData: z.union([WordscapesRoundSchema, z.array(GameRoundSchema)]).describe('The customized data for the game. The structure depends on the gameType.'),
+    gameData: z.union([WordscapesRoundSchema, SpellingBeeRoundSchema, z.array(GameRoundSchema)]).describe('The customized data for the game. The structure depends on the gameType.'),
 });
 
 export type CustomizeGameDifficultyOutput = z.infer<
@@ -97,7 +105,7 @@ Generate a creative and relevant title for this game session.
 
 Based on the game type, prepare the 'gameData':
 
-**If the game is 'Wordscapes', 'Word Cookies', or 'Spelling Bee (NYT)':**
+**If the game is 'Wordscapes' or 'Word Cookies':**
 1.  **Analyze and Extract:** Analyze the document text to identify 10-15 key vocabulary words that match the 'desiredDifficulty'.
 2.  **Select Base Letters:** Choose the longest and most interesting word from the extracted list to be the source for the letter wheel. This word should have 5-7 unique letters. If no single word works, create a compelling set of 5-7 letters based on the document's themes.
 3.  **Generate Word List:** From the chosen 5-7 letters, find ALL possible valid, real English words of 3 or more letters.
@@ -107,6 +115,22 @@ Based on the game type, prepare the 'gameData':
     *   **mainWords**: Select 5-12 of the most relevant or common words from the generated list, ensuring a good mix of word lengths. The 'mainWords' and 'bonusWords' lists MUST NOT contain any of the same words.
     *   **bonusWords**: All other valid words from the generated list that are NOT in 'mainWords' become bonus words.
 6.  The 'gameData' field should be a single object matching the 'WordscapesRoundSchema'.
+
+**If the game is 'Spelling Bee (NYT)':**
+1.  **Analyze and Extract:** Analyze the document to identify key vocabulary and themes matching the 'desiredDifficulty'.
+2.  **Select 7 Letters:** Choose a set of exactly 7 unique letters from the document's vocabulary. These letters should allow for the formation of many words, including at least one "pangram" (a word using all 7 letters).
+3.  **Designate Center Letter:** From the 7 letters, select one to be the mandatory 'centerLetter'. This letter should be common and appear in a large number of the potential words.
+4.  **Generate Word Lists:** Find all possible valid, real English words that meet the following criteria:
+    *   Must be at least 4 letters long.
+    *   Must be formable using ONLY the 7 chosen letters.
+    *   **CRITICAL RULE:** MUST include the 'centerLetter'.
+5.  **Create Game Level:**
+    *   **letters**: The array of 7 letters.
+    *   **centerLetter**: The single mandatory letter.
+    *   **mainWords**: A list of the most common/important words from the generated list that meet all criteria.
+    *   **bonusWords**: Any other valid words from the list that are not in 'mainWords'.
+6.  The 'gameData' field should be a single object matching the 'SpellingBeeRoundSchema'.
+
 
 **If the game is 'Drops' or 'Elevate':**
 1.  **Analyze and Extract:** Analyze the document to extract a list of 20-30 key vocabulary words, concepts, and their definitions/context, suitable for the desired difficulty.

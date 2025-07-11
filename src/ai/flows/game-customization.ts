@@ -23,16 +23,24 @@ export type CustomizeGameDifficultyInput = z.infer<
   typeof CustomizeGameDifficultyInputSchema
 >;
 
-const GameRoundSchema = z.object({
+const WordscapesRoundSchema = z.object({
+    letters: z.array(z.string()).min(5).max(7).describe('An array of 5-7 letters for the user to form words from.'),
+    mainWords: z.array(z.string()).describe('A list of primary words (3+ letters) for the user to find, which will be displayed in the grid.'),
+    bonusWords: z.array(z.string()).describe('An additional list of valid words (3+ letters) that can be formed but are not in the main grid.'),
+});
+
+const SimpleGameRoundSchema = z.object({
   word: z.string().describe('The correct word for the round.'),
   scrambled: z.string().describe('The scrambled/jumbled version of the word to show the user.'),
   displayPrompt: z.string().describe('The prompt to show the user for this round (e.g., "Unscramble the word").')
 });
 
 const CustomizeGameDifficultyOutputSchema = z.object({
-  gameTitle: z.string().describe('The title for this specific game session.'),
-  rounds: z.array(GameRoundSchema).describe('An array of game rounds, each with a word and a corresponding scrambled version or other data.'),
+    gameTitle: z.string().describe('The title for this specific game session.'),
+    gameType: z.string().describe('The type of game being played, to be passed to the client.'),
+    gameData: z.union([WordscapesRoundSchema, z.array(SimpleGameRoundSchema)]).describe('The customized data for the game. The structure depends on the gameType.'),
 });
+
 export type CustomizeGameDifficultyOutput = z.infer<
   typeof CustomizeGameDifficultyOutputSchema
 >;
@@ -47,18 +55,32 @@ const prompt = ai.definePrompt({
   name: 'customizeGameDifficultyPrompt',
   input: {schema: CustomizeGameDifficultyInputSchema},
   output: {schema: CustomizeGameDifficultyOutputSchema},
-  prompt: `You are a game customization expert. A user has uploaded a document and wants to play a game based on its vocabulary.
+  prompt: `You are a brilliant game designer specializing in creating educational word games. Your task is to generate a customized game level based on a user's uploaded document and selected game type.
 
 Document Text: {{{documentText}}}
 Game Type: {{{gameType}}}
 Desired Difficulty: {{{desiredDifficulty}}}
 
-1.  Analyze the document text to extract a list of 10 key vocabulary words suitable for the desired difficulty.
-2.  Based on the game type, prepare the data for each word.
-    *   If the game is 'Wordscapes', 'Word Cookies', or 'Spelling Bee (NYT)', the core mechanic is unscrambling letters. For each word, create a 'scrambled' version of it by jumbling the letters. The display prompt should be "Unscramble the letters to find the word."
-    *   For other games like 'Drops' or 'Elevate', which are more complex, for now, also use the unscramble mechanic as a fallback. Create a 'scrambled' version of the word and use the prompt "Unscramble the letters to find the word."
-3.  Generate a creative and relevant title for this game session.
-4.  Return the title and an array of 10 game rounds.`,
+Generate a creative and relevant title for this game session.
+
+Based on the game type, prepare the 'gameData':
+
+**If the game is 'Wordscapes', 'Word Cookies', or 'Spelling Bee (NYT)':**
+1.  **Extract Key Words:** Analyze the document text to identify 10-15 key vocabulary words that match the 'desiredDifficulty'.
+2.  **Select Base Word:** Choose the longest and most interesting word from the extracted list to be the source for the letter wheel. This word should have 5-7 unique letters. If no single word works, create a compelling set of 5-7 letters based on the document's themes.
+3.  **Generate Word List:** From the chosen 5-7 letters, find ALL possible valid English words of 3 or more letters.
+4.  **Create Game Level:**
+    *   **letters**: An array of the 5-7 letters for the wheel.
+    *   **mainWords**: Select 5-8 of the most relevant or common words from the generated list. These will be the words the user needs to find to complete the level.
+    *   **bonusWords**: All other valid words from the generated list become bonus words.
+5.  The 'gameData' field should be a single object matching the 'WordscapesRoundSchema'.
+
+**If the game is anything else (e.g., 'Drops', 'Elevate'):**
+1.  **Analyze and Extract:** Analyze the document to extract a list of 10 key vocabulary words suitable for the desired difficulty.
+2.  **Create Scrambled Words:** For each word, create a 'scrambled' version by jumbling its letters.
+3.  The 'gameData' field should be an array of 10 objects, each matching the 'SimpleGameRoundSchema', with a 'displayPrompt' of "Unscramble the letters to find the word."
+
+Set the 'gameType' in the output to be the same as the input 'gameType'. This is crucial for the client to render the correct UI.`,
 });
 
 const customizeGameDifficultyFlow = ai.defineFlow(

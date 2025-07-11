@@ -243,7 +243,7 @@ function GameComponent() {
       title: 'Answer Revealed',
       description: `The correct answer was: ${correctAnswer}`,
     });
-    setStreak(0); // Reset streak as a penalty
+    setStreak(0); // Reset streak as a penalty for revealing the answer.
     handleIncorrectAnswer();
   };
 

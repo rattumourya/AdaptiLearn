@@ -94,6 +94,7 @@ export default function DashboardPage() {
   const [isGameSelectOpen, setGameSelectOpen] = useState(false);
   const [isGameCustomizeOpen, setGameCustomizeOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -211,7 +212,7 @@ export default function DashboardPage() {
   };
 
   const handleDeleteDocument = async (docId: string) => {
-    setIsProcessing(true);
+    setDeletingDocId(docId);
     try {
       await deleteDoc(doc(db, "documents", docId));
       toast({
@@ -226,7 +227,7 @@ export default function DashboardPage() {
         variant: "destructive",
       });
     } finally {
-      setIsProcessing(false);
+      setDeletingDocId(null);
     }
   };
 
@@ -324,9 +325,9 @@ export default function DashboardPage() {
               size="icon"
               className="absolute top-2 right-2 h-7 w-7 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
               onClick={() => handleDeleteDocument(doc.id)}
-              disabled={isProcessing}
+              disabled={deletingDocId === doc.id}
             >
-              <X className="h-4 w-4" />
+              {deletingDocId === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
               <span className="sr-only">Delete document</span>
             </Button>
             <CardHeader>

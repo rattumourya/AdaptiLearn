@@ -17,7 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { generateHint } from "@/ai/flows/generate-hint";
-import type { CustomizeGameDifficultyOutput, GameRoundSchema } from "@/ai/flows/game-customization";
+import type { CustomizeGameDifficultyOutput } from "@/ai/flows/game-customization";
 import {
   Loader2,
   Lightbulb,
@@ -99,17 +99,16 @@ function GameComponent() {
 
   const advanceToNextRound = useCallback((delay: number) => {
     setTimeout(() => {
+      const nextRoundIndex = currentRoundIndex + 1;
+      if (nextRoundIndex >= (gameData?.gameData.length || 0) || lives <= 0 || timeLeft <= 0) {
+        setIsFinished(true);
+        return;
+      }
       setIsCorrect(null);
       setUserAnswer("");
-      
-      const nextRoundIndex = currentRoundIndex + 1;
-      if (nextRoundIndex < (gameData?.gameData.length || 0)) {
-        setCurrentRoundIndex(nextRoundIndex);
-      } else {
-        setIsFinished(true); // End of rounds
-      }
+      setCurrentRoundIndex(nextRoundIndex);
     }, delay);
-  }, [currentRoundIndex, gameData]);
+  }, [currentRoundIndex, gameData, lives, timeLeft]);
 
   const handleCorrectAnswer = useCallback((points = 10) => {
     const streakBonus = streak * 2;
@@ -120,11 +119,17 @@ function GameComponent() {
   }, [streak, advanceToNextRound]);
 
   const handleIncorrectAnswer = useCallback(() => {
-    setLives(prev => prev - 1);
+    const newLives = lives - 1;
+    setLives(newLives);
     setStreak(0);
     setIsCorrect(false);
-    advanceToNextRound(1500);
-  }, [advanceToNextRound]);
+    
+    if (newLives <= 0) {
+        setTimeout(() => setIsFinished(true), 1500);
+    } else {
+        advanceToNextRound(1500);
+    }
+  }, [lives, advanceToNextRound]);
 
   const handleSubmitAnswer = (e: React.FormEvent | string) => {
     if (typeof e !== 'string') e.preventDefault();
@@ -289,10 +294,11 @@ function GameComponent() {
     const shuffledImageOptions = useMemo(() => {
         if (currentRound.miniGameType === 'word-image-match') {
             const options = [
-                { word: currentRound.word, image: currentRound.correctImageDataUri, isCorrect: true },
-                ...currentRound.distractorWords.map(word => ({ word, image: `https://placehold.co/150x150.png`, isCorrect: false }))
+                { word: currentRound.word, image: currentRound.correctImageDataUri },
+                ...currentRound.distractorWords.map(word => ({ word, image: `https://placehold.co/150x150.png` }))
             ];
-            return shuffleArray(options);
+            const correctImageFirst = options.map(opt => ({...opt, isCorrect: opt.word === currentRound.word}));
+            return shuffleArray(correctImageFirst);
         }
         return [];
     }, [currentRound]);

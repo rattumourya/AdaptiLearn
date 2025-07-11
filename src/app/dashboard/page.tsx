@@ -281,12 +281,14 @@ export default function DashboardPage() {
           </Card>
         ))}
          <Card className="flex items-center justify-center border-2 border-dashed bg-transparent">
-            <DialogTrigger asChild>
-                <Button variant="ghost" className="flex flex-col h-auto p-8" onClick={() => setUploadOpen(true)}>
-                    <PlusCircle className="h-12 w-12 text-muted-foreground" />
-                    <span className="mt-2 text-sm font-medium text-muted-foreground">Add New Document</span>
-                </Button>
-            </DialogTrigger>
+            <Dialog open={isUploadOpen} onOpenChange={setUploadOpen}>
+                <DialogTrigger asChild>
+                    <Button variant="ghost" className="flex flex-col h-auto p-8">
+                        <PlusCircle className="h-12 w-12 text-muted-foreground" />
+                        <span className="mt-2 text-sm font-medium text-muted-foreground">Add New Document</span>
+                    </Button>
+                </DialogTrigger>
+            </Dialog>
         </Card>
       </div>
 

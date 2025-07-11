@@ -20,7 +20,6 @@ import { useToast } from "@/hooks/use-toast";
 import { MOCK_GAMES } from "@/lib/mock-data";
 import { generateHint } from "@/ai/flows/generate-hint";
 import {
-  customizeGameDifficulty,
   type CustomizeGameDifficultyOutput,
 } from "@/ai/flows/game-customization";
 import {
@@ -217,11 +216,11 @@ const WordCollection = ({ words, foundWords }: { words: string[], foundWords: st
 
     return (
         <div className="flex flex-wrap justify-center gap-4 my-4 p-4 bg-muted/50 rounded-lg">
-            {Object.keys(groupedWords).sort().map(len => (
+            {Object.entries(groupedWords).sort().map(([len, lenWords]) => (
                 <div key={len} className="flex flex-col items-center">
                     <h3 className="font-bold text-lg mb-2">{len} Letters</h3>
                     <div className="flex flex-col gap-2">
-                        {groupedWords[len as any].map(({word, found}, index) => (
+                        {lenWords.map(({word, found}, index) => (
                              <div key={`${word}-${index}`} className="px-4 py-2 rounded bg-background border-2 text-center min-w-[120px]">
                                  <span className={`text-lg font-semibold uppercase tracking-widest transition-opacity ${found ? 'opacity-100' : 'opacity-25'}`}>
                                     {found ? word : "•".repeat(word.length)}
@@ -244,6 +243,7 @@ const WordCollection = ({ words, foundWords }: { words: string[], foundWords: st
  * @returns True if the word is valid, false otherwise.
  */
 function isWordValid(word: string, letters: string[]): boolean {
+  if (!word || !letters.length) return false;
   const wordLower = word.toLowerCase();
   const lettersLower = letters.map(l => l.toLowerCase());
   
@@ -270,7 +270,6 @@ function GameComponent() {
 
   const [game, setGame] = useState<Game | null>(null);
   const [difficulty, setDifficulty] = useState<string | null>(null);
-  const [documentContent, setDocumentContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -300,92 +299,83 @@ function GameComponent() {
 
   useEffect(() => {
     const gameId = searchParams.get("gameId");
-    const docId = searchParams.get("docId");
     const difficultyParam = searchParams.get("difficulty");
+    const source = searchParams.get("source");
 
-    if (!gameId || !docId || !difficultyParam) {
+    if (!gameId || !difficultyParam || !source) {
       setError("Missing game information. Please go back and select a game.");
       setIsLoading(false);
       return;
     }
-
-    const foundGame = MOCK_GAMES.find((g) => g.id === gameId);
-    const content = sessionStorage.getItem("game_document_content");
-
-    if (!foundGame || !content) {
-      setError("Could not find the selected game or document.");
+    
+    const storedGameData = sessionStorage.getItem("currentGameData");
+    if (!storedGameData) {
+      setError("Could not load game data. Please try creating a new game from the dashboard.");
       setIsLoading(false);
       return;
     }
 
-    setGame(foundGame);
-    setDifficulty(difficultyParam);
-    setDocumentContent(content);
+    try {
+      const parsedGameData: CustomizeGameDifficultyOutput = JSON.parse(storedGameData);
+      const foundGame = MOCK_GAMES.find((g) => g.id === gameId);
 
-    const fetchGameData = async () => {
-      try {
-        const result = await customizeGameDifficulty({
-          documentText: content,
-          gameType: foundGame.name,
-          desiredDifficulty: difficultyParam as "easy" | "medium" | "hard",
-        });
+      if (!foundGame) {
+        setError("Could not find the selected game.");
+        setIsLoading(false);
+        return;
+      }
+      
+      setGame(foundGame);
+      setDifficulty(difficultyParam);
 
-        // Safeguard for Word Puzzle games
-        if (result.gameType && ['wordscapes', 'word cookies', 'spelling bee (nyt)'].includes(result.gameType.toLowerCase())) {
-          const wordPuzzleData = result.gameData as { letters: string[], mainWords: string[], bonusWords: string[], centerLetter?: string };
+      // Safeguard for Word Puzzle games
+      if (parsedGameData.gameType && ['wordscapes', 'word cookies', 'spelling bee (nyt)'].includes(parsedGameData.gameType.toLowerCase())) {
+        const wordPuzzleData = parsedGameData.gameData as { letters: string[], mainWords: string[], bonusWords: string[], centerLetter?: string };
+        
+        if (wordPuzzleData.letters && wordPuzzleData.mainWords && wordPuzzleData.bonusWords) {
           
-          if (wordPuzzleData.letters && wordPuzzleData.mainWords && wordPuzzleData.bonusWords) {
-            
-            const mainWordsSet = new Set(wordPuzzleData.mainWords.map(w => w.toLowerCase()));
+          // Filter words to ensure they are valid based on the given letters and rules
+          const validMainWords = wordPuzzleData.mainWords.filter(word => {
+              const isValid = isWordValid(word, wordPuzzleData.letters);
+              const hasCenter = !wordPuzzleData.centerLetter || word.toLowerCase().includes(wordPuzzleData.centerLetter.toLowerCase());
+              return isValid && hasCenter;
+          });
 
-            // Filter words to ensure they are valid based on the given letters and rules
-            const validMainWords = wordPuzzleData.mainWords.filter(word => {
-                const isValid = isWordValid(word, wordPuzzleData.letters);
-                const hasCenter = !wordPuzzleData.centerLetter || word.toLowerCase().includes(wordPuzzleData.centerLetter.toLowerCase());
-                return isValid && hasCenter;
-            });
-            const validBonusWords = wordPuzzleData.bonusWords.filter(word => {
-                const isValid = isWordValid(word, wordPuzzleData.letters);
-                const hasCenter = !wordPuzzleData.centerLetter || word.toLowerCase().includes(wordPuzzleData.centerLetter.toLowerCase());
-                return isValid && hasCenter;
-            });
-            
-            const validMainWordsSet = new Set(validMainWords.map(w => w.toLowerCase()));
-            const uniqueBonusWords = Array.from(new Set(validBonusWords.map(w => w.toLowerCase())))
-              .filter(bw => !validMainWordsSet.has(bw));
-            
-            wordPuzzleData.mainWords = validMainWords;
-            wordPuzzleData.bonusWords = uniqueBonusWords;
-            result.gameData = wordPuzzleData;
+          const validBonusWords = wordPuzzleData.bonusWords.filter(word => {
+              const isValid = isWordValid(word, wordPuzzleData.letters);
+              const hasCenter = !wordPuzzleData.centerLetter || word.toLowerCase().includes(wordPuzzleData.centerLetter.toLowerCase());
+              return isValid && hasCenter;
+          });
+          
+          const validMainWordsSet = new Set(validMainWords.map(w => w.toLowerCase()));
+          const uniqueBonusWords = Array.from(new Set(validBonusWords.map(w => w.toLowerCase())))
+            .filter(bw => !validMainWordsSet.has(bw));
+          
+          wordPuzzleData.mainWords = validMainWords;
+          wordPuzzleData.bonusWords = uniqueBonusWords;
+          parsedGameData.gameData = wordPuzzleData;
 
-            if (wordPuzzleData.letters) {
-                setShuffledLetters([...wordPuzzleData.letters].sort(() => Math.random() - 0.5));
-            }
+          if (wordPuzzleData.letters) {
+              setShuffledLetters([...wordPuzzleData.letters].sort(() => Math.random() - 0.5));
           }
         }
-
-        setGameData(result);
-        if (result.gameType?.toLowerCase().includes('elevate') || result.gameType?.toLowerCase().includes('drops')) {
-            const currentRound = (result.gameData as any[])?.[0];
-            if (currentRound?.miniGameType === 'memory') {
-                setMemoryPhase('showing');
-                setTimeout(() => setMemoryPhase('answering'), 5000); // Show words for 5 seconds
-            }
-        }
-      } catch (err) {
-        console.error("Failed to customize game:", err);
-        setError("Failed to generate the game. Please try again.");
-        toast({
-          title: "Error",
-          description: "Could not create a customized game.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
       }
-    };
 
-    fetchGameData();
+      setGameData(parsedGameData);
+
+      if (parsedGameData.gameType?.toLowerCase().includes('elevate') || parsedGameData.gameType?.toLowerCase().includes('drops')) {
+          const currentRound = (parsedGameData.gameData as any[])?.[0];
+          if (currentRound?.miniGameType === 'memory') {
+              setMemoryPhase('showing');
+              setTimeout(() => setMemoryPhase('answering'), 5000); // Show words for 5 seconds
+          }
+      }
+      setIsLoading(false);
+    } catch (err) {
+      console.error("Failed to parse game data from sessionStorage:", err);
+      setError("Failed to load the game. The data might be corrupted. Please try again.");
+      setIsLoading(false);
+    }
   }, [searchParams, toast]);
 
   useEffect(() => {
@@ -413,9 +403,10 @@ function GameComponent() {
 
 
   const handleGetHint = async () => {
-    if (!gameData || !documentContent) return;
+    if (!gameData) return;
     setIsHintLoading(true);
 
+    const documentContent = sessionStorage.getItem("game_document_content") || "No context available.";
     const currentWord = "the game words"; // Simplified for now
     
     try {
@@ -626,7 +617,7 @@ function GameComponent() {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
-        <p className="ml-4 text-lg">Crafting your game...</p>
+        <p className="ml-4 text-lg">Loading your game...</p>
       </div>
     );
   }
@@ -887,14 +878,14 @@ function GameComponent() {
 
 
             {isSpellingBee ? (
-                 <form onSubmit={handleSubmitAnswer} className="w-full flex items-center justify-center gap-2">
+                 <form onSubmit={(e) => handleSubmitAnswer(e)} className="w-full flex items-center justify-center gap-2">
                      <Button type="button" variant="outline" onClick={() => setUserAnswer(prev => prev.slice(0, -1))}>Delete</Button>
                      <Button type="submit" className="w-48" disabled={!userAnswer || lastSubmissionStatus !== null}>
                         <Send className="mr-2" /> Enter
                     </Button>
                  </form>
             ): (
-                 <form onSubmit={handleSubmitAnswer} className="w-full flex items-center justify-center gap-2">
+                 <form onSubmit={(e) => handleSubmitAnswer(e)} className="w-full flex items-center justify-center gap-2">
                      <Button type="submit" className="w-48" disabled={!userAnswer || lastSubmissionStatus !== null}>
                         <Send className="mr-2" /> Submit
                     </Button>
@@ -945,8 +936,13 @@ function GameComponent() {
 
 export default function GamePage() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+        <p className="ml-4 text-lg">Loading...</p>
+      </div>}>
       <GameComponent />
     </Suspense>
   );
 }
+
+    

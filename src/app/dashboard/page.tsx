@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useRef, useState } from "react";
@@ -146,7 +147,7 @@ export default function DashboardPage() {
       console.error("Error processing document:", error);
       toast({
         title: "Upload Failed",
-        description: "There was an error processing your document.",
+        description: (error as Error).message || "There was an error processing your document.",
         variant: "destructive",
       });
     } finally {
@@ -161,39 +162,38 @@ export default function DashboardPage() {
     setIsProcessing(true);
     toast({
       title: "Customizing game...",
-      description: `Generating a new ${selectedGame.name} game for you.`,
+      description: `Generating a new ${selectedGame.name} game for you. This may take a moment.`,
     });
     try {
-      const result = await customizeGameDifficulty({
+      const gameData = await customizeGameDifficulty({
         documentText: selectedDoc.content,
         gameType: selectedGame.name,
         desiredDifficulty: values.difficulty,
       });
-      console.log("Customized Game Parameters:", result);
-      setGameCustomizeOpen(false);
+      console.log("Customized Game Parameters:", gameData);
       
-      const docId = selectedDoc.id;
-      const gameId = selectedGame.id;
-      const difficulty = values.difficulty;
-
-      // Find the full document to pass to the game page
-      const documentToPlay = documents.find(doc => doc.id === docId);
+      // Store the generated game data in session storage to pass to the game page.
+      // This is more robust than passing huge objects in URL params.
+      sessionStorage.setItem('currentGameData', JSON.stringify(gameData));
       
-      // Store document content in session storage to pass to game page
-      if (documentToPlay) {
-        sessionStorage.setItem('game_document_content', documentToPlay.content);
-      }
+      const params = new URLSearchParams({
+        gameId: selectedGame.id,
+        difficulty: values.difficulty,
+        source: 'dashboard',
+      });
 
-      router.push(`/game?docId=${docId}&gameId=${gameId}&difficulty=${difficulty}`);
+      router.push(`/game?${params.toString()}`);
 
     } catch (error) {
       console.error("Error customizing game:", error);
       toast({
         title: "Customization Failed",
-        description: "Could not generate a custom game.",
+        description: (error as Error).message || "Could not generate a custom game. Please try again.",
         variant: "destructive",
       });
+    } finally {
        setIsProcessing(false);
+       setGameCustomizeOpen(false);
     } 
   };
 
@@ -205,6 +205,7 @@ export default function DashboardPage() {
   const openGameCustomization = (game: Game) => {
     setSelectedGame(game);
     setGameCustomizeOpen(true);
+    setGameSelectOpen(false);
   };
 
   return (
@@ -351,8 +352,8 @@ export default function DashboardPage() {
               Choose a game to play with words from "{selectedDoc?.title}".
             </DialogDescription>
           </DialogHeader>
-          <ScrollArea className="max-h-[70vh]">
-            <div className="grid gap-4 p-1 md:grid-cols-2 lg:grid-cols-3">
+          <ScrollArea className="max-h-[70vh] p-1">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {MOCK_GAMES.map((game) => (
                 <Card
                   key={game.id}
@@ -426,3 +427,5 @@ export default function DashboardPage() {
     </>
   );
 }
+
+    

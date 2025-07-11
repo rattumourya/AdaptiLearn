@@ -174,25 +174,28 @@ const WordCollection = ({ words, foundWords }: { words: string[], foundWords: st
 // --- Game Logic ---
 
 /**
- * Validates if a word can be formed from a given set of letters.
- * @param word The word to validate.
- * @param letters The available letters.
+ * Validates if a word can be formed from a given set of letters, respecting letter counts.
+ * @param word The word to validate (e.g., "apple").
+ * @param letters The available letters (e.g., ['a', 'p', 'p', 'l', 'e']).
  * @returns True if the word is valid, false otherwise.
  */
 function isWordValid(word: string, letters: string[]): boolean {
-  const letterCounts = letters.reduce((acc, letter) => {
-    acc[letter] = (acc[letter] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const wordLower = word.toLowerCase();
+  const lettersLower = letters.map(l => l.toLowerCase());
+  
+  const letterCounts: Record<string, number> = {};
+  for (const letter of lettersLower) {
+    letterCounts[letter] = (letterCounts[letter] || 0) + 1;
+  }
 
-  const wordCounts = word.toLowerCase().split('').reduce((acc, letter) => {
-    acc[letter] = (acc[letter] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  for (const char of wordLower) {
+    if (!letterCounts[char]) {
+      return false; // Letter not available
+    }
+    letterCounts[char]--;
+  }
 
-  return Object.entries(wordCounts).every(([letter, count]) => {
-    return letterCounts[letter] && letterCounts[letter] >= count;
-  });
+  return true;
 }
 
 

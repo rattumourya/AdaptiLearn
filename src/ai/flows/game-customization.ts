@@ -86,11 +86,11 @@ Based on the game type, prepare the 'gameData':
 1.  **Analyze and Extract:** Analyze the document text to identify 10-15 key vocabulary words that match the 'desiredDifficulty'.
 2.  **Select Base Letters:** Choose the longest and most interesting word from the extracted list to be the source for the letter wheel. This word should have 5-7 unique letters. If no single word works, create a compelling set of 5-7 letters based on the document's themes.
 3.  **Generate Word List:** From the chosen 5-7 letters, find ALL possible valid, real English words of 3 or more letters.
-4.  **CRITICAL RULE:** Every word you generate for 'mainWords' and 'bonusWords' MUST be formable using ONLY the letters you selected in step 2, respecting letter counts. For example, if you have one 'L', a word cannot use two 'L's. Do not include any words that use letters not in your selected set.
+4.  **CRITICAL RULE:** Every word you generate for 'mainWords' and 'bonusWords' MUST be formable using ONLY the letters you selected in step 2, respecting letter counts. For example, if you have one 'L', a word cannot use two 'L's. Do not include any words that use letters not in your selected set. Every word must be a real, dictionary-valid English word.
 5.  **Create Game Level:**
     *   **letters**: An array of the 5-7 letters for the wheel.
     *   **mainWords**: Select 5-12 of the most relevant or common words from the generated list, ensuring a good mix of word lengths.
-    *   **bonusWords**: All other valid words from the generated list that are NOT in \`mainWords\` become bonus words. The \`mainWords\` and \`bonusWords\` lists MUST NOT contain any of the same words.
+    *   **bonusWords**: All other valid words from the generated list that are NOT in 'mainWords' become bonus words. The 'mainWords' and 'bonusWords' lists MUST NOT contain any of the same words.
 6.  The 'gameData' field should be a single object matching the 'WordscapesRoundSchema'.
 
 **If the game is 'Drops' or 'Elevate':**
@@ -116,3 +116,4 @@ const customizeGameDifficultyFlow = ai.defineFlow(
     return output!;
   }
 );
+

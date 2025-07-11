@@ -171,6 +171,30 @@ const WordCollection = ({ words, foundWords }: { words: string[], foundWords: st
     );
 };
 
+// --- Game Logic ---
+
+/**
+ * Validates if a word can be formed from a given set of letters.
+ * @param word The word to validate.
+ * @param letters The available letters.
+ * @returns True if the word is valid, false otherwise.
+ */
+function isWordValid(word: string, letters: string[]): boolean {
+  const letterCounts = letters.reduce((acc, letter) => {
+    acc[letter] = (acc[letter] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const wordCounts = word.toLowerCase().split('').reduce((acc, letter) => {
+    acc[letter] = (acc[letter] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  return Object.entries(wordCounts).every(([letter, count]) => {
+    return letterCounts[letter] && letterCounts[letter] >= count;
+  });
+}
+
 
 function GameComponent() {
   const router = useRouter();
@@ -235,13 +259,19 @@ function GameComponent() {
           desiredDifficulty: difficultyParam as "easy" | "medium" | "hard",
         });
 
+        // Safeguard for Word Puzzle games
         if (result.gameType?.toLowerCase().includes('wordscapes') || result.gameType?.toLowerCase().includes('word cookies') || result.gameType?.toLowerCase().includes('spelling bee')) {
           const wordPuzzleData = result.gameData as { letters: string[], mainWords: string[], bonusWords: string[] };
-          // Ensure bonus words are unique and not in main words as a safeguard
-          const mainWordsSet = new Set(wordPuzzleData.mainWords.map(w => w.toLowerCase()));
-          const uniqueBonusWords = Array.from(new Set(wordPuzzleData.bonusWords.map(w => w.toLowerCase())))
+          
+          // Filter words to ensure they are valid based on the given letters
+          const validMainWords = wordPuzzleData.mainWords.filter(word => isWordValid(word, wordPuzzleData.letters));
+          const validBonusWords = wordPuzzleData.bonusWords.filter(word => isWordValid(word, wordPuzzleData.letters));
+          
+          const mainWordsSet = new Set(validMainWords.map(w => w.toLowerCase()));
+          const uniqueBonusWords = Array.from(new Set(validBonusWords.map(w => w.toLowerCase())))
             .filter(bw => !mainWordsSet.has(bw));
           
+          wordPuzzleData.mainWords = validMainWords;
           wordPuzzleData.bonusWords = uniqueBonusWords;
           result.gameData = wordPuzzleData;
         }
@@ -381,6 +411,14 @@ function GameComponent() {
 
     if (isWordPuzzleGame) {
         const wordPuzzleData = gameData.gameData as { letters: string[], mainWords: string[], bonusWords: string[] };
+        
+        // Also check if the submitted word is valid given the letters as a final client-side check
+        if (!isWordValid(submittedAnswer, wordPuzzleData.letters)) {
+            setLastSubmissionStatus('invalid');
+            setUserAnswer("");
+            setTimeout(() => setLastSubmissionStatus(null), 1500);
+            return;
+        }
 
         const isMainWord = wordPuzzleData.mainWords.map(w => w.toLowerCase()).includes(submittedAnswer);
         const isBonusWord = wordPuzzleData.bonusWords.map(w => w.toLowerCase()).includes(submittedAnswer);

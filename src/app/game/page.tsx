@@ -36,6 +36,7 @@ import {
   Timer,
   Check,
   X,
+  Eye,
 } from "lucide-react";
 import type { Game } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -311,6 +312,30 @@ function GameComponent() {
       setIsHintLoading(false);
     }
   };
+
+  const handleRevealAnswer = () => {
+    if (!gameData || !isWordPuzzleGame) return;
+    const wordPuzzleData = gameData.gameData as { letters: string[], mainWords: string[], bonusWords: string[] };
+    
+    const unfoundWord = wordPuzzleData.mainWords.find(
+      (word) => !foundMainWords.includes(word.toLowerCase())
+    );
+
+    if (unfoundWord) {
+      setFoundMainWords((prev) => [...prev, unfoundWord.toLowerCase()]);
+      setScore((prev) => Math.max(0, prev - 25)); // Deduct points
+      toast({
+        title: "Answer Revealed!",
+        description: `The word was: ${unfoundWord.toUpperCase()}`,
+      });
+    } else {
+      toast({
+        title: "No more words to reveal!",
+        description: "You've found them all.",
+      });
+    }
+  };
+
 
   const advanceToNextRound = (delay: number) => {
     setTimeout(() => {
@@ -660,7 +685,7 @@ function GameComponent() {
         {isWordPuzzleGame ? renderWordPuzzleGame() : renderCurrentRound()}
         
         <CardFooter className="flex justify-between items-center">
-            <div>
+            <div className="flex-1">
                  <p className="text-sm text-muted-foreground">Score: {score}</p>
                  {isWordPuzzleGame ? (
                      <p className="text-sm text-muted-foreground flex items-center gap-1">
@@ -670,10 +695,17 @@ function GameComponent() {
                      <p className="text-sm text-muted-foreground">Streak: {streak}x</p>
                  )}
             </div>
-            <Button variant="outline" onClick={handleGetHint} disabled={isHintLoading}>
-                {isHintLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Lightbulb className="mr-2 h-4 w-4"/>}
-                Get a Hint
-            </Button>
+             <div className="flex items-center gap-2">
+                {isWordPuzzleGame && (
+                  <Button variant="outline" size="sm" onClick={handleRevealAnswer}>
+                    <Eye className="mr-2 h-4 w-4" /> Reveal Answer
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={handleGetHint} disabled={isHintLoading}>
+                    {isHintLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Lightbulb className="mr-2 h-4 w-4"/>}
+                    Hint
+                </Button>
+            </div>
         </CardFooter>
       </Card>
     </div>

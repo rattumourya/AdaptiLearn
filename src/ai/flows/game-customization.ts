@@ -49,8 +49,23 @@ const TrueFalseRoundSchema = z.object({
     isTrue: z.boolean().describe("Whether the statement is true or false."),
 });
 
+const MemoryRoundSchema = z.object({
+    miniGameType: z.enum(['memory']).describe("The type of this mini-game round."),
+    wordsToShow: z.array(z.string()).describe("A list of 5-8 words to show the user briefly."),
+    question: z.string().describe("A question about the words shown, e.g., 'Which of these words was in the list?'"),
+    options: z.array(z.string()).describe("A list of 4 possible answers."),
+    correctAnswer: z.string().describe("The correct answer from the options."),
+});
 
-const GameRoundSchema = z.union([SimpleGameRoundSchema, MultipleChoiceRoundSchema, TrueFalseRoundSchema]);
+const CategorizationRoundSchema = z.object({
+    miniGameType: z.enum(['categorization']).describe("The type of this mini-game round."),
+    question: z.string().describe("The question asking which item does not belong."),
+    options: z.array(z.string()).describe("A list of 4 words, where 3 belong to a category and 1 does not."),
+    correctAnswer: z.string().describe("The word that does not belong to the category."),
+});
+
+
+const GameRoundSchema = z.union([SimpleGameRoundSchema, MultipleChoiceRoundSchema, TrueFalseRoundSchema, MemoryRoundSchema, CategorizationRoundSchema]);
 
 const CustomizeGameDifficultyOutputSchema = z.object({
     gameTitle: z.string().describe('The title for this specific game session.'),
@@ -72,7 +87,7 @@ const prompt = ai.definePrompt({
   name: 'customizeGameDifficultyPrompt',
   input: {schema: CustomizeGameDifficultyInputSchema},
   output: {schema: CustomizeGameDifficultyOutputSchema},
-  prompt: `You are a brilliant educational game designer. Your task is to generate a customized game level based on a user's uploaded document and selected game type.
+  prompt: `You are a brilliant educational game designer specializing in cognitive training. Your task is to generate a customized game level based on a user's uploaded document and selected game type.
 
 Document Text: {{{documentText}}}
 Game Type: {{{gameType}}}
@@ -89,17 +104,19 @@ Based on the game type, prepare the 'gameData':
 4.  **CRITICAL RULE:** Every word you generate for 'mainWords' and 'bonusWords' MUST be formable using ONLY the letters you selected in step 2, respecting letter counts. For example, if you have one 'L', a word cannot use two 'L's. Do not include any words that use letters not in your selected set. Every word must be a real, dictionary-valid English word.
 5.  **Create Game Level:**
     *   **letters**: An array of the 5-7 letters for the wheel.
-    *   **mainWords**: Select 5-12 of the most relevant or common words from the generated list, ensuring a good mix of word lengths.
-    *   **bonusWords**: All other valid words from the generated list that are NOT in 'mainWords' become bonus words. The 'mainWords' and 'bonusWords' lists MUST NOT contain any of the same words.
+    *   **mainWords**: Select 5-12 of the most relevant or common words from the generated list, ensuring a good mix of word lengths. The 'mainWords' and 'bonusWords' lists MUST NOT contain any of the same words.
+    *   **bonusWords**: All other valid words from the generated list that are NOT in 'mainWords' become bonus words.
 6.  The 'gameData' field should be a single object matching the 'WordscapesRoundSchema'.
 
 **If the game is 'Drops' or 'Elevate':**
-1.  **Analyze and Extract:** Analyze the document to extract a list of 15-20 key vocabulary words and their definitions/context, suitable for the desired difficulty.
+1.  **Analyze and Extract:** Analyze the document to extract a list of 20-30 key vocabulary words, concepts, and their definitions/context, suitable for the desired difficulty.
 2.  **Create 5-Minute Session:** Generate an array of approximately 20-25 varied mini-game rounds that can be completed in a 5-minute session. The goal is rapid-fire engagement.
-3.  **Vary Mini-Games:** The generated array should be a mix of the following schemas: (\`SimpleGameRoundSchema\`), (\`MultipleChoiceRoundSchema\`), and (\`TrueFalseRoundSchema\`).
+3.  **Vary Mini-Games:** The generated array should be a mix of the following schemas: (\`SimpleGameRoundSchema\`), (\`MultipleChoiceRoundSchema\`), (\`TrueFalseRoundSchema\`), (\`MemoryRoundSchema\`), and (\`CategorizationRoundSchema\`).
     *   For **'unscramble'** (\`SimpleGameRoundSchema\`): Pick a word, scramble it, and set the prompt to "Unscramble the letters."
     *   For **'multiple-choice'** (\`MultipleChoiceRoundSchema\`): Use a word's definition as the 'question'. The 'options' should be four words, one of which is correct. The other three should be plausible but incorrect distractors from the document.
     *   For **'true-false'** (\`TrueFalseRoundSchema\`): Create a statement like "'{word}' means '{definition}'". Randomly make the definition correct or incorrect (from another word in the document).
+    *   For **'memory'** (\`MemoryRoundSchema\`): Briefly show the user a list of 5-8 words from the document. Then, ask a multiple-choice question like "Which of these words was in the list you just saw?". One option is correct, the others are plausible distractors.
+    *   For **'categorization'** (\`CategorizationRoundSchema\`): Present four words. Three should belong to a clear category (e.g., types of fish, words related to space) from the document, and one should be an outlier. The user must select the word that doesn't belong.
 4.  The 'gameData' field should be an array of objects, each matching one of the varied round schemas.
 
 Set the 'gameType' in the output to be the same as the input 'gameType'. This is crucial for the client to render the correct UI.`,

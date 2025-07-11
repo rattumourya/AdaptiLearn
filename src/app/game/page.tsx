@@ -37,6 +37,8 @@ import {
   Check,
   X,
   Eye,
+  BrainCircuit,
+  Shapes,
 } from "lucide-react";
 import type { Game } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -161,8 +163,8 @@ const WordCollection = ({ words, foundWords }: { words: string[], foundWords: st
                     <div className="flex flex-col gap-2">
                         {groupedWords[len as any].map((word, index) => (
                              <div key={`${word}-${index}`} className="px-4 py-2 rounded bg-background border-2 text-center min-w-[120px]">
-                                 <span className={`text-lg font-semibold uppercase tracking-widest transition-opacity ${foundWords.includes(word) ? 'opacity-100' : 'opacity-25'}`}>
-                                    {foundWords.includes(word) ? word : "•".repeat(word.length)}
+                                 <span className={`text-lg font-semibold uppercase tracking-widest transition-opacity ${foundWords.includes(word.toLowerCase()) ? 'opacity-100' : 'opacity-25'}`}>
+                                    {foundWords.includes(word.toLowerCase()) ? word : "•".repeat(word.length)}
                                  </span>
                              </div>
                         ))}
@@ -185,10 +187,10 @@ function isWordValid(word: string, letters: string[]): boolean {
   const wordLower = word.toLowerCase();
   const lettersLower = letters.map(l => l.toLowerCase());
   
-  const letterCounts: Record<string, number> = {};
-  for (const letter of lettersLower) {
-    letterCounts[letter] = (letterCounts[letter] || 0) + 1;
-  }
+  const letterCounts = lettersLower.reduce((acc, letter) => {
+    acc[letter] = (acc[letter] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
   for (const char of wordLower) {
     if (!letterCounts[char] || letterCounts[char] === 0) {
@@ -225,12 +227,15 @@ function GameComponent() {
   const [foundBonusWords, setFoundBonusWords] = useState<string[]>([]);
   const [lastSubmissionStatus, setLastSubmissionStatus] = useState<'correct' | 'bonus' | 'invalid' | 'duplicate' | null>(null);
   
-  // Drops specific state
+  // Drops/Elevate specific state
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes
   const [lives, setLives] = useState(3);
   const [streak, setStreak] = useState(0);
-
+  const [memoryPhase, setMemoryPhase] = useState<'showing' | 'answering'>('showing');
+  
   const isWordPuzzleGame = gameData?.gameType?.toLowerCase().includes('wordscapes') || gameData?.gameType?.toLowerCase().includes('word cookies') || gameData?.gameType?.toLowerCase().includes('spelling bee');
+  const isCognitiveGame = gameData?.gameType?.toLowerCase().includes('drops') || gameData?.gameType?.toLowerCase().includes('elevate');
+
 
   useEffect(() => {
     const gameId = searchParams.get("gameId");
@@ -265,23 +270,32 @@ function GameComponent() {
         });
 
         // Safeguard for Word Puzzle games
-        if (result.gameType?.toLowerCase().includes('wordscapes') || result.gameType?.toLowerCase().includes('word cookies') || result.gameType?.toLowerCase().includes('spelling bee')) {
+        if (result.gameType && ['wordscapes', 'word cookies', 'spelling bee (nyt)'].includes(result.gameType.toLowerCase())) {
           const wordPuzzleData = result.gameData as { letters: string[], mainWords: string[], bonusWords: string[] };
           
-          // Filter words to ensure they are valid based on the given letters
-          const validMainWords = wordPuzzleData.mainWords.filter(word => isWordValid(word, wordPuzzleData.letters));
-          const validBonusWords = wordPuzzleData.bonusWords.filter(word => isWordValid(word, wordPuzzleData.letters));
-          
-          const mainWordsSet = new Set(validMainWords.map(w => w.toLowerCase()));
-          const uniqueBonusWords = Array.from(new Set(validBonusWords.map(w => w.toLowerCase())))
-            .filter(bw => !mainWordsSet.has(bw));
-          
-          wordPuzzleData.mainWords = validMainWords;
-          wordPuzzleData.bonusWords = uniqueBonusWords;
-          result.gameData = wordPuzzleData;
+          if (wordPuzzleData.letters && wordPuzzleData.mainWords && wordPuzzleData.bonusWords) {
+            // Filter words to ensure they are valid based on the given letters
+            const validMainWords = wordPuzzleData.mainWords.filter(word => isWordValid(word, wordPuzzleData.letters));
+            const validBonusWords = wordPuzzleData.bonusWords.filter(word => isWordValid(word, wordPuzzleData.letters));
+            
+            const mainWordsSet = new Set(validMainWords.map(w => w.toLowerCase()));
+            const uniqueBonusWords = Array.from(new Set(validBonusWords.map(w => w.toLowerCase())))
+              .filter(bw => !mainWordsSet.has(bw));
+            
+            wordPuzzleData.mainWords = validMainWords;
+            wordPuzzleData.bonusWords = uniqueBonusWords;
+            result.gameData = wordPuzzleData;
+          }
         }
 
         setGameData(result);
+        if (result.gameType?.toLowerCase().includes('elevate') || result.gameType?.toLowerCase().includes('drops')) {
+            const currentRound = (result.gameData as any[])?.[0];
+            if (currentRound?.miniGameType === 'memory') {
+                setMemoryPhase('showing');
+                setTimeout(() => setMemoryPhase('answering'), 5000); // Show words for 5 seconds
+            }
+        }
       } catch (err) {
         console.error("Failed to customize game:", err);
         setError("Failed to generate the game. Please try again.");
@@ -301,21 +315,21 @@ function GameComponent() {
   useEffect(() => {
     if (!gameData || isLoading || isFinished) return;
 
-    if (gameData.gameType?.toLowerCase().includes('drops')) {
+    if (isCognitiveGame) {
         if (timeLeft > 0 && lives > 0) {
             const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
             return () => clearTimeout(timer);
-        } else {
+        } else if (!isFinished) {
             setIsFinished(true);
         }
     }
-  }, [timeLeft, lives, gameData, isLoading, isFinished]);
+  }, [timeLeft, lives, gameData, isLoading, isFinished, isCognitiveGame]);
 
 
   useEffect(() => {
     if (gameData && isWordPuzzleGame) {
         const wordPuzzleData = gameData.gameData as { letters: string[], mainWords: string[], bonusWords: string[] };
-        if (wordPuzzleData.mainWords.length > 0 && foundMainWords.length === wordPuzzleData.mainWords.length) {
+        if (wordPuzzleData.mainWords && wordPuzzleData.mainWords.length > 0 && foundMainWords.length === wordPuzzleData.mainWords.length) {
             setIsFinished(true);
         }
     }
@@ -372,39 +386,49 @@ function GameComponent() {
   };
 
 
-  const advanceToNextRound = (delay: number) => {
+  const advanceToNextRound = useCallback((delay: number) => {
     setTimeout(() => {
         setIsCorrect(null);
-        if (gameData?.gameType?.toLowerCase().includes('drops')) {
-            const dropsGameData = gameData.gameData as any[];
-            if (currentRoundIndex < dropsGameData.length - 1) {
-                setCurrentRoundIndex(currentRoundIndex + 1);
+        setUserAnswer("");
+        
+        if (isCognitiveGame) {
+            const cognitiveGameData = gameData?.gameData as any[];
+            const nextRoundIndex = currentRoundIndex + 1;
+
+            if (nextRoundIndex < cognitiveGameData.length) {
+                setCurrentRoundIndex(nextRoundIndex);
+                const nextRound = cognitiveGameData[nextRoundIndex];
+                if (nextRound.miniGameType === 'memory') {
+                    setMemoryPhase('showing');
+                    setTimeout(() => setMemoryPhase('answering'), 5000); // Show words for 5 seconds
+                }
             } else {
                 setIsFinished(true);
             }
         }
-        setUserAnswer("");
     }, delay);
-  };
+  }, [currentRoundIndex, gameData, isCognitiveGame]);
 
-  const handleCorrectAnswer = () => {
+  const handleCorrectAnswer = useCallback(() => {
     const points = 10 + streak * 2;
     setScore(prev => prev + points);
     setStreak(prev => prev + 1);
     setIsCorrect(true);
     advanceToNextRound(1200);
-  };
+  }, [streak, advanceToNextRound]);
 
-  const handleIncorrectAnswer = () => {
-    setLives(prev => prev - 1);
+  const handleIncorrectAnswer = useCallback(() => {
+    setLives(prev => {
+        const newLives = prev - 1;
+        if (newLives <= 0) {
+            setIsFinished(true);
+        }
+        return newLives;
+    });
     setStreak(0);
     setIsCorrect(false);
-    if (lives - 1 <= 0) {
-        setIsFinished(true);
-    } else {
-        advanceToNextRound(1200);
-    }
-  };
+    advanceToNextRound(1200);
+  }, [advanceToNextRound]);
 
 
   const handleSubmitAnswer = (e: React.FormEvent | string) => {
@@ -417,7 +441,7 @@ function GameComponent() {
     if (isWordPuzzleGame) {
         const wordPuzzleData = gameData.gameData as { letters: string[], mainWords: string[], bonusWords: string[] };
         
-        // Also check if the submitted word is valid given the letters as a final client-side check
+        // Final client-side check for validity
         if (!isWordValid(submittedAnswer, wordPuzzleData.letters)) {
             setLastSubmissionStatus('invalid');
             setUserAnswer("");
@@ -450,19 +474,21 @@ function GameComponent() {
         setUserAnswer("");
         setTimeout(() => setLastSubmissionStatus(null), 1500);
 
-    } else { // Logic for Drops and other sequential games
+    } else { // Logic for Drops/Elevate and other sequential games
         const currentRound = (gameData.gameData as any[])[currentRoundIndex];
         let correct = false;
 
         switch (currentRound.miniGameType) {
             case 'unscramble':
-                correct = submittedAnswer === currentRound.word.toLowerCase();
-                break;
             case 'multiple-choice':
+            case 'categorization':
                 correct = submittedAnswer === currentRound.correctAnswer.toLowerCase();
                 break;
             case 'true-false':
                 correct = (submittedAnswer === 'true') === currentRound.isTrue;
+                break;
+            case 'memory':
+                correct = submittedAnswer === currentRound.correctAnswer.toLowerCase();
                 break;
         }
 
@@ -549,9 +575,8 @@ function GameComponent() {
                             <p>Bonus words found: {foundBonusWords.length}</p>
                         </div>
                     )}
-                     {!isPuzzle && (
+                     {isCognitiveGame && (
                         <div className="text-sm text-muted-foreground">
-                             <p>Highest streak: {streak}</p>
                              <p>Rounds completed: {currentRoundIndex + 1} / {totalWords}</p>
                         </div>
                     )}
@@ -567,8 +592,6 @@ function GameComponent() {
   }
 
   const renderGameHeader = () => {
-    const isDrops = gameData?.gameType?.toLowerCase().includes('drops');
-
     return (
       <CardHeader>
           <div className="flex justify-between items-start">
@@ -576,7 +599,7 @@ function GameComponent() {
               <CardTitle className="font-headline text-3xl">{game?.name}</CardTitle>
               <CardDescription>{gameData?.gameTitle}</CardDescription>
             </div>
-            {isDrops ? (
+            {isCognitiveGame ? (
                  <div className="flex items-center gap-4">
                     <div className="flex items-center gap-1.5 text-rose-500 font-semibold">
                          <Heart className="w-5 h-5"/>
@@ -615,7 +638,7 @@ function GameComponent() {
     }
 
     return (
-        <CardContent className={cn("text-center transition-all duration-300", getFeedbackRingColor())}>
+        <CardContent className={cn("text-center transition-all duration-300 min-h-[300px] flex flex-col justify-center", getFeedbackRingColor())}>
             <div className={`p-4 rounded-lg ring-4 ${getFeedbackRingColor()}`}>
             {currentRound.miniGameType === 'unscramble' && (
                 <>
@@ -679,6 +702,56 @@ function GameComponent() {
                     </div>
                 </>
             )}
+            {currentRound.miniGameType === 'memory' && (
+                <>
+                    {memoryPhase === 'showing' ? (
+                        <div className="flex flex-col items-center animate-pulse">
+                            <BrainCircuit className="w-16 h-16 text-primary mb-4"/>
+                            <p className="text-lg font-semibold mb-2">Memorize these words!</p>
+                            <div className="flex flex-wrap justify-center gap-2 p-4 rounded-lg bg-muted/50">
+                                {currentRound.wordsToShow.map((word: string) => (
+                                    <Badge key={word} variant="secondary" className="text-lg">{word}</Badge>
+                                ))}
+                            </div>
+                        </div>
+                    ) : (
+                        <div>
+                             <p className="text-lg font-semibold mb-6">{currentRound.question}</p>
+                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {currentRound.options.map((option: string) => (
+                                    <Button
+                                        key={option}
+                                        variant="outline"
+                                        className="h-auto py-4 text-base"
+                                        onClick={() => handleSubmitAnswer(option)}
+                                        disabled={isCorrect !== null}
+                                    >
+                                        {option}
+                                    </Button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </>
+            )}
+            {currentRound.miniGameType === 'categorization' && (
+                 <>
+                    <p className="text-lg font-semibold mb-6">{currentRound.question}</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {currentRound.options.map((option: string) => (
+                            <Button
+                                key={option}
+                                variant="outline"
+                                className="h-auto py-4 text-base"
+                                onClick={() => handleSubmitAnswer(option)}
+                                disabled={isCorrect !== null}
+                            >
+                                {option}
+                            </Button>
+                        ))}
+                    </div>
+                </>
+            )}
             </div>
         </CardContent>
     );
@@ -725,7 +798,7 @@ function GameComponent() {
       <Card>
         {renderGameHeader()}
         
-        {isWordPuzzleGame ? renderWordPuzzleGame() : renderCurrentRound()}
+        {isCognitiveGame ? renderCurrentRound() : renderWordPuzzleGame()}
         
         <CardFooter className="flex justify-between items-center">
             <div className="flex-1">
@@ -740,11 +813,11 @@ function GameComponent() {
             </div>
              <div className="flex items-center gap-2">
                 {isWordPuzzleGame && (
-                  <Button variant="outline" size="sm" onClick={handleRevealAnswer}>
+                  <Button variant="outline" size="sm" onClick={handleRevealAnswer} disabled={isFinished}>
                     <Eye className="mr-2 h-4 w-4" /> Reveal Answer
                   </Button>
                 )}
-                <Button variant="outline" size="sm" onClick={handleGetHint} disabled={isHintLoading}>
+                <Button variant="outline" size="sm" onClick={handleGetHint} disabled={isHintLoading || isFinished}>
                     {isHintLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Lightbulb className="mr-2 h-4 w-4"/>}
                     Hint
                 </Button>
@@ -762,5 +835,3 @@ export default function GamePage() {
     </Suspense>
   );
 }
-
-    

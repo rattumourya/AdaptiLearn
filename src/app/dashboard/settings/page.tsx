@@ -108,7 +108,7 @@ export default function SettingsPage() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)}>
               <CardHeader>
-                <CardTitle className="font-headline">Public Profile</CardTitle>
+                <CardTitle>Public Profile</CardTitle>
                 <CardDescription>
                   This information will be displayed on your profile and leaderboards.
                 </CardDescription>

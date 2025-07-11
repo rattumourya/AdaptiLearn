@@ -1,4 +1,3 @@
-
 // src/components/header.tsx
 "use client";
 
@@ -73,10 +72,6 @@ export default function Header() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => navigateTo('/dashboard/settings')}>
-                <User className="mr-2" />
-                <span>Profile</span>
-              </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => navigateTo('/dashboard/settings')}>
                 <Settings className="mr-2" />
                 <span>Settings</span>

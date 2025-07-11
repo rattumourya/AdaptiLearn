@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState, Suspense, useCallback } from "react";
+import { useEffect, useState, Suspense, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Card,
@@ -25,13 +25,22 @@ import {
   X,
   ChevronLeft,
   Eye,
-  BrainCircuit,
   Timer,
   Heart,
   Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
+
+// Fisher-Yates shuffle algorithm
+const shuffleArray = <T,>(array: T[]): T[] => {
+  const newArray = [...array];
+  for (let i = newArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+  }
+  return newArray;
+};
 
 function GameComponent() {
   const router = useRouter();
@@ -129,9 +138,10 @@ function GameComponent() {
 
     switch (currentRound.miniGameType) {
         case 'word-translation-match':
+             isAnswerCorrect = submittedAnswer === currentRound.correctTranslation.toLowerCase();
+             break;
         case 'word-image-match':
-            // These are handled by button clicks with the answer embedded
-            isAnswerCorrect = submittedAnswer === 'correct';
+            isAnswerCorrect = submittedAnswer === currentRound.word.toLowerCase();
             break;
         case 'spelling-completion':
             isAnswerCorrect = submittedAnswer === currentRound.word.toLowerCase();
@@ -272,33 +282,49 @@ function GameComponent() {
     </CardHeader>
   );
 
-  const renderCurrentRound = () => {
+  function CurrentRoundComponent() {
     const feedbackClass = isCorrect === true ? 'ring-green-500' : isCorrect === false ? 'ring-red-500' : 'ring-transparent';
-    
+
+    // Memoize the shuffled options so they don't re-shuffle on every render
+    const shuffledImageOptions = useMemo(() => {
+        if (currentRound.miniGameType === 'word-image-match') {
+            const options = [
+                { word: currentRound.word, image: currentRound.correctImageDataUri, isCorrect: true },
+                ...currentRound.distractorWords.map(word => ({ word, image: `https://placehold.co/150x150.png`, isCorrect: false }))
+            ];
+            return shuffleArray(options);
+        }
+        return [];
+    }, [currentRound]);
+
+    const shuffledTranslationOptions = useMemo(() => {
+        if (currentRound.miniGameType === 'word-translation-match') {
+            const options = [currentRound.correctTranslation, ...currentRound.distractorTranslations];
+            return shuffleArray(options);
+        }
+        return [];
+    }, [currentRound]);
+
     return (
-        <CardContent className={cn("min-h-[350px] flex flex-col items-center justify-center p-4 transition-all", feedbackClass)}>
+        <CardContent className={cn("min-h-[350px] flex flex-col items-center justify-center p-4 transition-all")}>
             <div className={cn("w-full text-center p-4 rounded-lg ring-4 transition-all", feedbackClass)}>
                 <p className="font-semibold text-lg mb-4">{currentRound.displayPrompt}</p>
 
                 {currentRound.miniGameType === 'word-image-match' && (
                     <div className="grid grid-cols-2 gap-4">
-                        <Button variant="outline" className="h-auto p-2 flex flex-col gap-2" onClick={() => handleSubmitAnswer('correct')} disabled={isCorrect !== null}>
-                            <Image src={currentRound.correctImageDataUri} alt={currentRound.word} width={150} height={150} className="rounded-md" data-ai-hint="object concept"/>
-                            {currentRound.word}
-                        </Button>
-                        {currentRound.distractorWords.map(word => (
-                            <Button key={word} variant="outline" className="h-auto p-2 flex flex-col gap-2" onClick={() => handleSubmitAnswer('incorrect')} disabled={isCorrect !== null}>
-                                <Image src={`https://placehold.co/150x150.png`} alt={word} width={150} height={150} className="rounded-md" data-ai-hint="object concept"/>
-                                {word}
-                            </Button>
+                        {shuffledImageOptions.map(option => (
+                           <Button key={option.word} variant="outline" className="h-auto p-2 flex flex-col gap-2" onClick={() => handleSubmitAnswer(option.word)} disabled={isCorrect !== null}>
+                               <Image src={option.image} alt={option.word} width={150} height={150} className="rounded-md object-cover" data-ai-hint="object concept"/>
+                               {option.word}
+                           </Button>
                         ))}
                     </div>
                 )}
-
+                
                 {currentRound.miniGameType === 'word-translation-match' && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {[currentRound.correctTranslation, ...currentRound.distractorTranslations].sort(() => Math.random() - 0.5).map(translation => (
-                            <Button key={translation} variant="outline" className="h-16 text-base" onClick={() => handleSubmitAnswer(translation === currentRound.correctTranslation ? 'correct' : 'incorrect')} disabled={isCorrect !== null}>
+                        {shuffledTranslationOptions.map(translation => (
+                            <Button key={translation} variant="outline" className="h-16 text-base" onClick={() => handleSubmitAnswer(translation)} disabled={isCorrect !== null}>
                                 {translation}
                             </Button>
                         ))}
@@ -308,7 +334,7 @@ function GameComponent() {
                 {(currentRound.miniGameType === 'spelling-completion' || currentRound.miniGameType === 'trace-or-type') && (
                     <>
                         <p className="text-4xl font-bold tracking-widest my-8 uppercase">{currentRound.miniGameType === 'spelling-completion' ? currentRound.promptWord : currentRound.word}</p>
-                        <form onSubmit={(e) => handleSubmitAnswer(e)} className="flex flex-col items-center gap-4">
+                        <form onSubmit={(e) => handleSubmitAnswer(e)} className="flex flex-col items-center gap-4 w-full">
                             <Input
                                 value={userAnswer}
                                 onChange={(e) => setUserAnswer(e.target.value)}
@@ -344,6 +370,7 @@ function GameComponent() {
     );
   };
 
+
   return (
     <div className="container mx-auto max-w-2xl py-8">
       <Button variant="ghost" onClick={() => router.push("/dashboard")} className="mb-4">
@@ -352,7 +379,7 @@ function GameComponent() {
       </Button>
       <Card>
         {renderGameHeader()}
-        {renderCurrentRound()}
+        <CurrentRoundComponent />
         <CardFooter className="flex justify-between items-center">
             <div className="flex items-center gap-2">
                  <p className="text-sm text-muted-foreground">Score: <span className="font-bold">{score}</span></p>
@@ -382,5 +409,3 @@ export default function GamePage() {
     </Suspense>
   );
 }
-
-    

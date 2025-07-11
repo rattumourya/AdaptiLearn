@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Camera, Loader2, User } from "lucide-react";
@@ -12,7 +12,7 @@ import {
   uploadBytes,
   getDownloadURL,
 } from "firebase/storage";
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -46,7 +46,7 @@ const profileSchema = z.object({
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
 export default function SettingsPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, setUserData } = useAuth();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -60,30 +60,11 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (user) {
-      const fetchUserData = async () => {
-        const userDocRef = doc(db, "users", user.uid);
-        const userDocSnap = await getDoc(userDocRef).catch((error) => {
-          console.error("Firestore read failed:", error);
-          return null; // Handle case where Firestore might be offline/unreachable
-        });
-        
-        if (userDocSnap && userDocSnap.exists()) {
-          const userData = userDocSnap.data();
-          form.reset({
-            name: userData.name || user.name || "",
-            email: userData.email || user.email || "",
-          });
-          setAvatarPreview(userData.photoURL || user.photoURL || null);
-        } else {
-          // Fallback to auth data if Firestore doc doesn't exist
-          form.reset({
-            name: user.name || "",
-            email: user.email || "",
-          });
-          setAvatarPreview(user.photoURL || null);
-        }
-      };
-      fetchUserData();
+      form.reset({
+        name: user.name || "",
+        email: user.email || "",
+      });
+      setAvatarPreview(user.photoURL || null);
     }
   }, [user, form]);
 
@@ -116,23 +97,27 @@ export default function SettingsPage() {
 
     setIsSaving(true);
     try {
-      let photoURL = avatarPreview;
+      let newPhotoURL = user.photoURL || null;
 
       // If a new avatar file was selected, upload it
       if (avatarFile) {
         const storageRef = ref(storage, `avatars/${user.uid}/${avatarFile.name}`);
         const snapshot = await uploadBytes(storageRef, avatarFile);
-        photoURL = await getDownloadURL(snapshot.ref);
+        newPhotoURL = await getDownloadURL(snapshot.ref);
       }
+      
+      const updatedUserData = {
+        name: values.name,
+        photoURL: newPhotoURL,
+        email: values.email, // email is read-only but we save it for consistency
+      };
 
       // Update user profile in Firestore
       const userDocRef = doc(db, "users", user.uid);
-      // Use setDoc with merge:true to create or update
-      await setDoc(userDocRef, {
-        name: values.name,
-        photoURL: photoURL || null,
-        email: values.email,
-      }, { merge: true });
+      await setDoc(userDocRef, updatedUserData, { merge: true });
+
+      // Update the auth context state
+      setUserData({ ...user, ...updatedUserData });
 
       toast({
         title: "Profile Updated",
@@ -140,14 +125,14 @@ export default function SettingsPage() {
       });
     } catch (error) {
       console.error("Error updating profile:", error);
-      toast({ title: "Save Failed", description: "Could not update your profile.", variant: "destructive" });
+      toast({ title: "Save Failed", description: (error as Error).message || "Could not update your profile.", variant: "destructive" });
     } finally {
       setIsSaving(false);
       setAvatarFile(null);
     }
   };
 
-  if (authLoading || (user && !form.getValues('email'))) {
+  if (authLoading || !user) {
     return (
         <div className="mx-auto grid max-w-4xl gap-6">
             <div className="space-y-2">
@@ -160,6 +145,7 @@ export default function SettingsPage() {
                  <div className="flex flex-col items-center gap-4 sm:flex-row">
                     <Skeleton className="h-24 w-24 rounded-full" />
                     <div className="space-y-2">
+                        <Skeleton className="h-10 w-24" />
                         <Skeleton className="h-6 w-32" />
                         <Skeleton className="h-4 w-48" />
                     </div>
@@ -225,7 +211,6 @@ export default function SettingsPage() {
                   </Button>
                 </div>
                 <div className="text-center sm:text-left">
-
                   <h3 className="text-lg font-semibold">
                     {form.watch("name")}
                   </h3>

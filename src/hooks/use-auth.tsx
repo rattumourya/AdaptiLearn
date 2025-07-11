@@ -7,9 +7,10 @@ import React, {
   useEffect,
   useState,
   ReactNode,
+  useCallback,
 } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useRouter, usePathname } from "next/navigation";
 
 import { auth, db } from "@/lib/firebase";
@@ -18,11 +19,13 @@ import type { UserProfile } from "@/lib/types";
 interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
+  setUserData: (user: UserProfile) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
+  setUserData: () => {},
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -30,6 +33,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
+
+  const setUserData = useCallback((userData: UserProfile) => {
+    setUser(userData);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -40,13 +47,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (userDocSnap.exists()) {
           setUser({ uid: firebaseUser.uid, ...userDocSnap.data() } as UserProfile);
         } else {
-            // Handle case where user exists in Auth but not Firestore
+            // This case handles a new user from Google Sign-In or a user whose DB entry was deleted.
             const newUserProfile: UserProfile = {
                 uid: firebaseUser.uid,
                 email: firebaseUser.email!,
                 name: firebaseUser.displayName || firebaseUser.email?.split('@')[0],
                 photoURL: firebaseUser.photoURL || undefined,
             };
+            // Create the doc in firestore immediately
+            await setDoc(doc(db, "users", firebaseUser.uid), newUserProfile, { merge: true });
             setUser(newUserProfile);
         }
         if (pathname === '/') {
@@ -66,7 +75,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [router, pathname]);
 
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ user, loading, setUserData }}>
       {children}
     </AuthContext.Provider>
   );

@@ -3,7 +3,7 @@
 
 import Header from "@/components/header";
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
-import { BarChart3, Library } from "lucide-react";
+import { BarChart3, Library, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -30,6 +30,14 @@ function NavContent() {
                <SidebarMenuButton tooltip="My Progress" isActive={pathname === '/dashboard/results'}>
                 <BarChart3 />
                 <span>My Progress</span>
+              </SidebarMenuButton>
+            </Link>
+          </SidebarMenuItem>
+           <SidebarMenuItem>
+            <Link href="/dashboard/settings">
+               <SidebarMenuButton tooltip="Settings" isActive={pathname === '/dashboard/settings'}>
+                <Settings />
+                <span>Settings</span>
               </SidebarMenuButton>
             </Link>
           </SidebarMenuItem>

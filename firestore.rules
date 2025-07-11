@@ -1,26 +1,22 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users can only read/write their own user document.
+    // Users can read their own profile, and authenticated users can create their profile.
     match /users/{userId} {
-      allow read, write: if request.auth.uid == userId;
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null;
     }
 
-    // Users can only read/write their own documents.
+    // A user can manage their own documents.
     match /documents/{documentId} {
-      allow read, write: if request.auth.uid == request.resource.data.userId;
-      allow delete: if request.auth.uid == resource.data.userId;
+      allow read, create, delete: if request.auth != null && request.auth.uid == request.resource.data.userId;
     }
-    
-    // Users can create game results for themselves.
-    // Users can read their own game results.
-    // Users can update their own game results.
+
+    // A user can manage their own game results.
     match /gameResults/{resultId} {
-      allow create: if request.auth.uid == request.resource.data.userId;
-      allow read, update: if request.auth.uid == resource.data.userId;
+       allow read, create, update: if request.auth != null && request.auth.uid == request.resource.data.userId;
     }
   }
 }

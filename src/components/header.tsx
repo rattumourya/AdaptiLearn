@@ -1,3 +1,4 @@
+
 // src/components/header.tsx
 "use client";
 
@@ -20,6 +21,7 @@ import { Logo } from "@/components/icons/logo";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { auth } from "@/lib/firebase";
+import { SidebarTrigger } from "./ui/sidebar";
 
 export default function Header() {
   const router = useRouter();
@@ -42,13 +44,23 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:px-6">
-      <Link
-        href="/dashboard"
-        className="flex items-center gap-2 text-lg font-semibold text-foreground md:text-base"
-      >
-        <Logo className="h-7 w-7 text-primary" />
-        <h1 className="font-headline text-2xl tracking-tight">AdaptiLearn</h1>
-      </Link>
+      <div className="flex items-center gap-4">
+        <SidebarTrigger className="md:hidden"/>
+        <Link
+          href="/dashboard"
+          className="hidden md:flex items-center gap-2 text-lg font-semibold text-foreground md:text-base"
+        >
+          <Logo className="h-7 w-7 text-primary" />
+          <h1 className="font-headline text-2xl tracking-tight">AdaptiLearn</h1>
+        </Link>
+      </div>
+
+      <div className="flex md:hidden items-center gap-2 text-lg font-semibold text-foreground md:text-base">
+         <Logo className="h-7 w-7 text-primary" />
+         <h1 className="font-headline text-2xl tracking-tight">AdaptiLearn</h1>
+      </div>
+
+
       <div className="ml-auto flex items-center gap-4">
         {loading ? (
           <Loader2 className="h-6 w-6 animate-spin" />

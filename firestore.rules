@@ -1,0 +1,26 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users can only read/write their own user document.
+    match /users/{userId} {
+      allow read, write: if request.auth.uid == userId;
+    }
+
+    // Users can only read/write their own documents.
+    match /documents/{documentId} {
+      allow read, write: if request.auth.uid == request.resource.data.userId;
+      allow delete: if request.auth.uid == resource.data.userId;
+    }
+    
+    // Users can create game results for themselves.
+    // Users can read their own game results.
+    // Users can update their own game results.
+    match /gameResults/{resultId} {
+      allow create: if request.auth.uid == request.resource.data.userId;
+      allow read, update: if request.auth.uid == resource.data.userId;
+    }
+  }
+}

@@ -24,6 +24,11 @@ export default function Header() {
     router.push(path);
   };
 
+  const handleLogout = () => {
+    // In a real app, you'd clear the session/token here
+    router.push('/');
+  }
+
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:px-6">
       <Link
@@ -62,7 +67,7 @@ export default function Header() {
               <span>Settings</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => (window.location.href = "/")}>
+            <DropdownMenuItem onSelect={handleLogout}>
               <LogOut className="mr-2 h-4 w-4" />
               <span>Log out</span>
             </DropdownMenuItem>

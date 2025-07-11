@@ -23,12 +23,15 @@ export type CustomizeGameDifficultyInput = z.infer<
   typeof CustomizeGameDifficultyInputSchema
 >;
 
+const GameRoundSchema = z.object({
+  word: z.string().describe('The correct word for the round.'),
+  scrambled: z.string().describe('The scrambled/jumbled version of the word to show the user.'),
+  displayPrompt: z.string().describe('The prompt to show the user for this round (e.g., "Unscramble the word").')
+});
+
 const CustomizeGameDifficultyOutputSchema = z.object({
-  customizedParameters: z
-    .string()
-    .describe(
-      'The customized game parameters based on the vocabulary level and desired difficulty.'
-    ),
+  gameTitle: z.string().describe('The title for this specific game session.'),
+  rounds: z.array(GameRoundSchema).describe('An array of game rounds, each with a word and a corresponding scrambled version or other data.'),
 });
 export type CustomizeGameDifficultyOutput = z.infer<
   typeof CustomizeGameDifficultyOutputSchema
@@ -44,16 +47,18 @@ const prompt = ai.definePrompt({
   name: 'customizeGameDifficultyPrompt',
   input: {schema: CustomizeGameDifficultyInputSchema},
   output: {schema: CustomizeGameDifficultyOutputSchema},
-  prompt: `You are a game customization expert. A user has uploaded a document and wants to customize the difficulty of a game based on the document's vocabulary.
+  prompt: `You are a game customization expert. A user has uploaded a document and wants to play a game based on its vocabulary.
 
 Document Text: {{{documentText}}}
 Game Type: {{{gameType}}}
 Desired Difficulty: {{{desiredDifficulty}}}
 
-Analyze the document text to determine its vocabulary level. Based on the vocabulary level and the desired difficulty, suggest customized game parameters. The customized parameters should be appropriate to be directly used by the game.
-For example, parameters can include things such as what words to include in the game, what minimum word lengths should be, how much time the player gets, whether to give hints, etc.
-
-Return these customized parameters in the 'customizedParameters' field.`,
+1.  Analyze the document text to extract a list of 10 key vocabulary words suitable for the desired difficulty.
+2.  Based on the game type, prepare the data for each word.
+    *   If the game is 'Wordscapes', 'Word Cookies', or 'Spelling Bee (NYT)', the core mechanic is unscrambling letters. For each word, create a 'scrambled' version of it by jumbling the letters. The display prompt should be "Unscramble the letters to find the word."
+    *   For other games like 'Drops' or 'Elevate', which are more complex, for now, also use the unscramble mechanic as a fallback. Create a 'scrambled' version of the word and use the prompt "Unscramble the letters to find the word."
+3.  Generate a creative and relevant title for this game session.
+4.  Return the title and an array of 10 game rounds.`,
 });
 
 const customizeGameDifficultyFlow = ai.defineFlow(

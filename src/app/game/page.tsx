@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { MOCK_GAMES, MOCK_DOCUMENTS } from "@/lib/mock-data";
 import { generateHint } from "@/ai/flows/generate-hint";
-import { customizeGameDifficulty } from "@/ai/flows/game-customization";
+import { customizeGameDifficulty, type CustomizeGameDifficultyOutput } from "@/ai/flows/game-customization";
 import { Loader2, Lightbulb, CheckCircle, XCircle, ChevronLeft } from "lucide-react";
 import type { Game } from "@/lib/types";
 
@@ -33,8 +33,8 @@ function GameComponent() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [gameData, setGameData] = useState<any>(null); // To store customized game params
-  const [currentWordIndex, setCurrentWordIndex] = useState(0);
+  const [gameData, setGameData] = useState<CustomizeGameDifficultyOutput | null>(null); // To store customized game params
+  const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
   const [userAnswer, setUserAnswer] = useState("");
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [score, setScore] = useState(0);
@@ -72,14 +72,7 @@ function GameComponent() {
           gameType: foundGame.name,
           desiredDifficulty: difficultyParam as "easy" | "medium" | "hard",
         });
-        // The AI returns a string, so we need to parse it.
-        // A more robust solution would be to ask the AI for JSON.
-        const parsedData = {
-          words: result.customizedParameters
-            .split(",")
-            .map((w) => w.trim()),
-        };
-        setGameData(parsedData);
+        setGameData(result);
       } catch (err) {
         console.error("Failed to customize game:", err);
         setError("Failed to generate the game. Please try again.");
@@ -100,7 +93,7 @@ function GameComponent() {
     if (!gameData || !documentContent) return;
     setIsHintLoading(true);
     try {
-      const currentWord = gameData.words[currentWordIndex];
+      const currentWord = gameData.rounds[currentRoundIndex].word;
       const result = await generateHint({
         documentContext: documentContent,
         word: currentWord,
@@ -124,8 +117,8 @@ function GameComponent() {
     e.preventDefault();
     if (!gameData) return;
 
-    const currentWord = gameData.words[currentWordIndex];
-    const correct = userAnswer.toLowerCase() === currentWord.toLowerCase();
+    const currentWord = gameData.rounds[currentRoundIndex].word;
+    const correct = userAnswer.trim().toLowerCase() === currentWord.toLowerCase();
     setIsCorrect(correct);
     if (correct) {
       setScore(score + 1);
@@ -134,8 +127,8 @@ function GameComponent() {
     setTimeout(() => {
       setIsCorrect(null);
       setUserAnswer("");
-      if (currentWordIndex < gameData.words.length - 1) {
-        setCurrentWordIndex(currentWordIndex + 1);
+      if (currentRoundIndex < gameData.rounds.length - 1) {
+        setCurrentRoundIndex(currentRoundIndex + 1);
       } else {
         setIsFinished(true);
       }
@@ -169,12 +162,12 @@ function GameComponent() {
             <Card className="w-full max-w-md text-center">
                 <CardHeader>
                     <CardTitle className="font-headline text-3xl">Game Over!</CardTitle>
-                    <CardDescription>You've completed the game.</CardDescription>
+                    <CardDescription>You've completed {gameData?.gameTitle}.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <p className="text-xl">Your final score is:</p>
-                    <p className="text-5xl font-bold text-primary my-4">{score} / {gameData.words.length}</p>
-                    <Progress value={(score / gameData.words.length) * 100} className="mt-4" />
+                    <p className="text-5xl font-bold text-primary my-4">{score} / {gameData?.rounds.length}</p>
+                    <Progress value={(score / (gameData?.rounds.length || 1)) * 100} className="mt-4" />
                 </CardContent>
                 <CardFooter>
                     <Button onClick={() => router.push('/dashboard')} className="w-full">
@@ -185,6 +178,8 @@ function GameComponent() {
         </div>
     )
   }
+
+  const currentRound = gameData?.rounds[currentRoundIndex];
 
   return (
     <div className="container mx-auto max-w-2xl py-8">
@@ -197,20 +192,21 @@ function GameComponent() {
           <div className="flex justify-between items-start">
             <div>
                 <CardTitle className="font-headline text-3xl">{game?.name}</CardTitle>
-                <CardDescription>A custom game based on your document.</CardDescription>
+                <CardDescription>{gameData?.gameTitle}</CardDescription>
             </div>
             <Badge variant="secondary" className="capitalize">{difficulty}</Badge>
           </div>
-          <Progress value={((currentWordIndex + 1) / (gameData?.words?.length || 1)) * 100} className="mt-4" />
+          <Progress value={((currentRoundIndex + 1) / (gameData?.rounds?.length || 1)) * 100} className="mt-4" />
         </CardHeader>
         <CardContent className="text-center">
-            <div className="my-8">
-                <p className="text-muted-foreground mb-2">What is this word?</p>
-                <p className="text-4xl font-bold tracking-widest uppercase blur-sm select-none">
-                    {gameData?.words[currentWordIndex]}
-                </p>
-                <p className="text-sm text-muted-foreground mt-2">Unscramble the letters to find the word.</p>
-            </div>
+            {currentRound && (
+              <div className="my-8">
+                  <p className="text-muted-foreground mb-2">{currentRound.displayPrompt}</p>
+                  <p className="text-4xl font-bold tracking-widest uppercase">
+                      {currentRound.scrambled}
+                  </p>
+              </div>
+            )}
           <form onSubmit={handleSubmitAnswer}>
             <div className="relative">
               <Input
@@ -253,5 +249,3 @@ export default function GamePage() {
         </Suspense>
     )
 }
-
-    

@@ -7,14 +7,14 @@ export const MOCK_GAMES: Game[] = [
   {
     id: 'game-1',
     name: 'Wordscapes',
-    description: 'Form words from given letters to fill crossword puzzles. Visually calming and addictive.',
+    description: 'Form words from given letters to fill crossword puzzles. A relaxing classic.',
     improves: ['Vocabulary', 'Spelling'],
   },
   {
     id: 'game-2',
-    name: 'Drops',
-    description: '5-minute daily vocab practice. Uses pictures and swipes to remember words.',
-    improves: ['Vocabulary (visual)'],
+    name: 'QuickLearn Session',
+    description: 'A dynamic, 5-minute session with varied mini-games to rapidly boost vocabulary.',
+    improves: ['Recall', 'Spelling', 'Visual Learning'],
   },
   {
     id: 'game-3',
@@ -24,9 +24,9 @@ export const MOCK_GAMES: Game[] = [
   },
   {
     id: 'game-4',
-    name: 'Elevate',
-    description: 'Daily brain-training with an English focus. Tracks progress over time.',
-    improves: ['Grammar', 'Reading', 'Writing'],
+    name: 'Flying Word Adventure',
+    description: 'Fly a plane and collect the right letters to spell words. Great for kids!',
+    improves: ['Spelling', 'Hand-Eye Coordination'],
   },
     {
     id: 'game-5',

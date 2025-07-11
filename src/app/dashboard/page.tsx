@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -79,6 +79,7 @@ export default function DashboardPage() {
   const [isGameCustomizeOpen, setGameCustomizeOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const uploadForm = useForm<z.infer<typeof uploadSchema>>({
     resolver: zodResolver(uploadSchema),
@@ -89,6 +90,33 @@ export default function DashboardPage() {
     resolver: zodResolver(gameCustomizationSchema),
     defaultValues: { difficulty: "medium" },
   });
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.type === 'text/plain') {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const text = e.target?.result as string;
+          uploadForm.setValue('text', text);
+          if (!uploadForm.getValues('title')) {
+            uploadForm.setValue('title', file.name.replace(/\.[^/.]+$/, ""));
+          }
+          toast({
+            title: "File content loaded",
+            description: "The content of your file has been pasted into the text area.",
+          });
+        };
+        reader.readAsText(file);
+      } else {
+        toast({
+          title: "Unsupported File Type",
+          description: "Please upload a .txt file for now. PDF and other formats are not yet supported.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
 
   const handleUploadSubmit = async (values: z.infer<typeof uploadSchema>) => {
     setIsProcessing(true);
@@ -197,8 +225,22 @@ export default function DashboardPage() {
             <Form {...uploadForm}>
               <form onSubmit={uploadForm.handleSubmit(handleUploadSubmit)} className="space-y-4">
                 <div className="space-y-2">
-                    <Button type="button" variant="outline" className="w-full" disabled={isProcessing}>
-                        <UploadCloud className="mr-2 h-4 w-4"/> Upload File (.txt, .pdf, .epub)
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                      className="hidden"
+                      accept=".txt"
+                      disabled={isProcessing}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      disabled={isProcessing}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                        <UploadCloud className="mr-2 h-4 w-4"/> Upload File (.txt)
                     </Button>
                     <div className="relative">
                         <div className="absolute inset-0 flex items-center">

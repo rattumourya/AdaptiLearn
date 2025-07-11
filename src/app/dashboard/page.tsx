@@ -174,7 +174,8 @@ export default function DashboardPage() {
           text += content.items.map((item: any) => item.str).join(" ");
         }
       } else if (
-        file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        file.type ===
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
       ) {
         const arrayBuffer = await file.arrayBuffer();
         const result = await mammoth.extractRawText({ arrayBuffer });
@@ -182,14 +183,25 @@ export default function DashboardPage() {
       } else if (file.type === "text/plain") {
         text = await file.text();
       } else {
-        throw new Error("Unsupported file type. Please upload a PDF, DOCX, or TXT file.");
+        throw new Error(
+          "Unsupported file type. Please upload a PDF, DOCX, or TXT file."
+        );
+      }
+
+      // Client-side length validation before AI call
+      if (text.length < 50) {
+        throw new Error("The document is too short. Please provide at least 50 characters of text.");
       }
 
       uploadForm.setValue("text", text);
       if (!uploadForm.getValues("title")) {
         uploadForm.setValue("title", file.name.replace(/\.[^/.]+$/, ""));
       }
-      update({ id: toastId, title: "File read successfully!", description: "Content has been loaded into the form." });
+      update({
+        id: toastId,
+        title: "File read successfully!",
+        description: "Content has been loaded into the form.",
+      });
     } catch (error) {
       console.error("Error processing file:", error);
       update({
@@ -206,7 +218,6 @@ export default function DashboardPage() {
       }
     }
   };
-
 
   const handleUploadSubmit = async (values: z.infer<typeof uploadSchema>) => {
     if (!user) {
@@ -225,13 +236,21 @@ export default function DashboardPage() {
 
     try {
       // Step 1: Validate content with AI
-      const validationResult = await validateDocument({ documentText: values.text });
+      const validationResult = await validateDocument({
+        documentText: values.text,
+      });
 
       if (!validationResult.isValid) {
-          throw new Error(validationResult.reason || "The provided content is not suitable for generating a game.");
+        throw new Error(
+          validationResult.reason ||
+            "The provided content is not suitable for generating a game."
+        );
       }
-      
-      update({ id: toastId, description: "Validation successful. Saving your document." });
+
+      update({
+        id: toastId,
+        description: "Validation successful. Saving your document.",
+      });
 
       // Step 2: Add document to Firestore
       await addDoc(collection(db, "documents"), {
@@ -254,7 +273,9 @@ export default function DashboardPage() {
       update({
         id: toastId,
         title: "Upload Failed",
-        description: (error as Error).message || "There was an error saving your document.",
+        description:
+          (error as Error).message ||
+          "There was an error saving your document.",
         variant: "destructive",
       });
     } finally {
@@ -313,9 +334,8 @@ export default function DashboardPage() {
         });
         sessionStorage.setItem("currentGameResultId", gameResultRef.id);
       }
-      
-      router.push(`/game`);
 
+      router.push(`/game`);
     } catch (error) {
       console.error("Error customizing game:", error);
       dismiss(toastId);
@@ -327,7 +347,7 @@ export default function DashboardPage() {
         variant: "destructive",
       });
       setIsProcessing(false);
-    } 
+    }
   };
 
   const openGameSelection = (doc: Document) => {
@@ -353,76 +373,91 @@ export default function DashboardPage() {
     <>
       <div className="flex items-center justify-between space-y-2">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight font-headline">My Library</h1>
+          <h1 className="text-3xl font-bold tracking-tight font-headline">
+            My Library
+          </h1>
           <p className="text-muted-foreground">
             Your personal collection of documents for learning.
           </p>
         </div>
       </div>
 
-       {!isLoadingDocs && documents.length === 0 && (
-         <Alert className="mt-6">
-           <Sparkles className="h-4 w-4" />
-           <AlertTitle>Welcome to AdaptiLearn!</AlertTitle>
-           <AlertDescription>
-             You don&apos;t have any documents yet. Add your first one by clicking the card below to start creating personalized games.
-           </AlertDescription>
-         </Alert>
-       )}
+      {!isLoadingDocs && documents.length === 0 && (
+        <Alert className="mt-6">
+          <Sparkles className="h-4 w-4" />
+          <AlertTitle>Welcome to AdaptiLearn!</AlertTitle>
+          <AlertDescription>
+            You don&apos;t have any documents yet. Add your first one by
+            clicking the card below to start creating personalized games.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-6">
-        {isLoadingDocs && Array.from({ length: 3 }).map((_, i) => (
-          <Card key={i}>
-            <CardHeader><Skeleton className="h-8 w-24" /></CardHeader>
-            <CardContent><Skeleton className="h-16 w-full" /></CardContent>
-            <CardFooter><Skeleton className="h-10 w-full" /></CardFooter>
-          </Card>
-        ))}
+        {isLoadingDocs &&
+          Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-8 w-24" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-16 w-full" />
+              </CardContent>
+              <CardFooter>
+                <Skeleton className="h-10 w-full" />
+              </CardFooter>
+            </Card>
+          ))}
 
-        {!isLoadingDocs && documents.map((doc) => (
-          <Card key={doc.id} className="relative group">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-2 right-2 h-7 w-7 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
-              onClick={() => handleDeleteDocument(doc.id)}
-              disabled={deletingDocId === doc.id}
-            >
-              {deletingDocId === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
-              <span className="sr-only">Delete document</span>
-            </Button>
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <FileText className="h-8 w-8 text-primary" />
-                {doc.createdAt && (
-                  <Badge variant="outline">
-                    {formatDistanceToNow(
-                      (doc.createdAt as any).toDate
-                        ? (doc.createdAt as any).toDate()
-                        : new Date(doc.createdAt as string),
-                      { addSuffix: true }
-                    )}
-                  </Badge>
-                )}
-              </div>
-              <CardTitle className="pt-4">{doc.title}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground line-clamp-3">
-                {doc.content}
-              </p>
-            </CardContent>
-            <CardFooter>
+        {!isLoadingDocs &&
+          documents.map((doc) => (
+            <Card key={doc.id} className="relative group">
               <Button
-                className="w-full"
-                onClick={() => openGameSelection(doc)}
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2 h-7 w-7 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                onClick={() => handleDeleteDocument(doc.id)}
+                disabled={deletingDocId === doc.id}
               >
-                <Gamepad2 className="mr-2" />
-                Play Games
+                {deletingDocId === doc.id ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <X className="h-4 w-4" />
+                )}
+                <span className="sr-only">Delete document</span>
               </Button>
-            </CardFooter>
-          </Card>
-        ))}
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <FileText className="h-8 w-8 text-primary" />
+                  {doc.createdAt && (
+                    <Badge variant="outline">
+                      {formatDistanceToNow(
+                        (doc.createdAt as any).toDate
+                          ? (doc.createdAt as any).toDate()
+                          : new Date(doc.createdAt as string),
+                        { addSuffix: true }
+                      )}
+                    </Badge>
+                  )}
+                </div>
+                <CardTitle className="pt-4">{doc.title}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground line-clamp-3">
+                  {doc.content}
+                </p>
+              </CardContent>
+              <CardFooter>
+                <Button
+                  className="w-full"
+                  onClick={() => openGameSelection(doc)}
+                >
+                  <Gamepad2 className="mr-2" />
+                  Play Games
+                </Button>
+              </CardFooter>
+            </Card>
+          ))}
 
         {!isLoadingDocs && (
           <Dialog open={isUploadOpen} onOpenChange={setUploadOpen}>
@@ -440,7 +475,8 @@ export default function DashboardPage() {
               <DialogHeader>
                 <DialogTitle>Add New Document</DialogTitle>
                 <DialogDescription>
-                  Upload a file (PDF, DOCX, TXT) or paste text to create a new learning set.
+                  Upload a file (PDF, DOCX, TXT) or paste text to create a new
+                  learning set.
                 </DialogDescription>
               </DialogHeader>
               <Form {...uploadForm}>
@@ -464,7 +500,8 @@ export default function DashboardPage() {
                       disabled={isProcessing}
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      <UploadCloud className="mr-2" /> Upload File (PDF, DOCX, TXT)
+                      <UploadCloud className="mr-2" /> Upload File (PDF, DOCX,
+                      TXT)
                     </Button>
                     <div className="relative">
                       <div className="absolute inset-0 flex items-center">
@@ -534,7 +571,8 @@ export default function DashboardPage() {
           <DialogHeader>
             <DialogTitle>Select a Game</DialogTitle>
             <DialogDescription>
-              Choose a game to play with words from &quot;{selectedDoc?.title}&quot;.
+              Choose a game to play with words from &quot;{selectedDoc?.title}
+              &quot;.
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[70vh] p-1">

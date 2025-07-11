@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -6,6 +7,14 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+} from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +37,8 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Logo } from "@/components/icons/logo";
 import { GoogleIcon } from "@/components/icons/google";
+import { useToast } from "@/hooks/use-toast";
+import { auth, db } from "@/lib/firebase";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email." }),
@@ -38,8 +49,10 @@ const formSchema = z.object({
 
 export default function AuthPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [activeTab, setActiveTab] = useState("sign-in");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -49,21 +62,71 @@ export default function AuthPage() {
     },
   });
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
-    console.log(values);
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      if (activeTab === "sign-up") {
+        // Sign Up
+        const userCredential = await createUserWithEmailAndPassword(
+          auth,
+          values.email,
+          values.password
+        );
+        const user = userCredential.user;
+        // Create a user profile document in Firestore
+        await setDoc(doc(db, "users", user.uid), {
+          uid: user.uid,
+          email: user.email,
+          name: user.email?.split('@')[0] || 'New User',
+          createdAt: new Date().toISOString(),
+        });
+        toast({ title: "Account created successfully!" });
+      } else {
+        // Sign In
+        await signInWithEmailAndPassword(auth, values.email, values.password);
+        toast({ title: "Signed in successfully!" });
+      }
       router.push("/dashboard");
-    }, 1000);
+    } catch (error: any) {
+      console.error("Authentication error:", error);
+      toast({
+        title: "Authentication Failed",
+        description: error.message || "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleGoogleSignIn = () => {
+  const handleGoogleSignIn = async () => {
     setLoading(true);
-    // Simulate Google sign-in
-    setTimeout(() => {
+    const provider = new GoogleAuthProvider();
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Create a user profile doc if it's a new user
+      await setDoc(doc(db, "users", user.uid), {
+          uid: user.uid,
+          email: user.email,
+          name: user.displayName || user.email?.split('@')[0],
+          photoURL: user.photoURL,
+          createdAt: new Date().toISOString(),
+      }, { merge: true }); // Merge to avoid overwriting existing data
+
+      toast({ title: "Signed in with Google successfully!" });
       router.push("/dashboard");
-    }, 1000);
+    } catch (error: any) {
+      console.error("Google sign-in error:", error);
+      toast({
+        title: "Google Sign-In Failed",
+        description: error.message || "Could not sign in with Google.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -72,17 +135,21 @@ export default function AuthPage() {
         <Logo className="h-8 w-8 text-primary" />
         <h1 className="font-headline">AdaptiLearn</h1>
       </div>
-      <Tabs defaultValue="sign-in" className="w-full max-w-md">
+      <Tabs
+        defaultValue="sign-in"
+        className="w-full max-w-md"
+        onValueChange={(value) => setActiveTab(value)}
+      >
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="sign-in">Sign In</TabsTrigger>
           <TabsTrigger value="sign-up">Sign Up</TabsTrigger>
         </TabsList>
+
+        {/* Sign In Tab */}
         <TabsContent value="sign-in">
           <Card>
             <CardHeader className="text-center">
-              <CardTitle className="font-headline text-2xl">
-                Welcome Back!
-              </CardTitle>
+              <CardTitle>Welcome Back!</CardTitle>
               <CardDescription>
                 Sign in to continue your learning journey.
               </CardDescription>
@@ -131,9 +198,9 @@ export default function AuthPage() {
                               disabled={loading}
                             >
                               {showPassword ? (
-                                <EyeOff className="h-4 w-4" />
+                                <EyeOff />
                               ) : (
-                                <Eye className="h-4 w-4" />
+                                <Eye />
                               )}
                             </button>
                           </div>
@@ -144,7 +211,7 @@ export default function AuthPage() {
                   />
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="mr-2 animate-spin" />
                     )}
                     Sign In
                   </Button>
@@ -169,7 +236,7 @@ export default function AuthPage() {
                 disabled={loading}
               >
                 {loading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 animate-spin" />
                 ) : (
                   <GoogleIcon className="mr-2 h-5 w-5" />
                 )}
@@ -178,12 +245,12 @@ export default function AuthPage() {
             </CardFooter>
           </Card>
         </TabsContent>
+
+        {/* Sign Up Tab */}
         <TabsContent value="sign-up">
-           <Card>
+          <Card>
             <CardHeader className="text-center">
-              <CardTitle className="font-headline text-2xl">
-                Create an Account
-              </CardTitle>
+              <CardTitle>Create an Account</CardTitle>
               <CardDescription>
                 Start your personalized learning adventure today.
               </CardDescription>
@@ -218,7 +285,7 @@ export default function AuthPage() {
                       <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                           <div className="relative">
+                          <div className="relative">
                             <Input
                               type={showPassword ? "text" : "password"}
                               placeholder="••••••••"
@@ -232,9 +299,9 @@ export default function AuthPage() {
                               disabled={loading}
                             >
                               {showPassword ? (
-                                <EyeOff className="h-4 w-4" />
+                                <EyeOff />
                               ) : (
-                                <Eye className="h-4 w-4" />
+                                <Eye />
                               )}
                             </button>
                           </div>
@@ -245,14 +312,14 @@ export default function AuthPage() {
                   />
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="mr-2 animate-spin" />
                     )}
                     Create Account
                   </Button>
                 </form>
               </Form>
             </CardContent>
-             <CardFooter className="flex flex-col gap-4">
+            <CardFooter className="flex flex-col gap-4">
               <div className="relative w-full">
                 <div className="absolute inset-0 flex items-center">
                   <span className="w-full border-t" />
@@ -270,7 +337,7 @@ export default function AuthPage() {
                 disabled={loading}
               >
                 {loading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 animate-spin" />
                 ) : (
                   <GoogleIcon className="mr-2 h-5 w-5" />
                 )}

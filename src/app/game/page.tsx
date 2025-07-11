@@ -191,6 +191,18 @@ function GameComponent() {
           gameType: foundGame.name,
           desiredDifficulty: difficultyParam as "easy" | "medium" | "hard",
         });
+
+        if (result.gameType?.toLowerCase().includes('wordscapes')) {
+          const wordscapesData = result.gameData as { letters: string[], mainWords: string[], bonusWords: string[] };
+          // Ensure bonus words are unique and not in main words as a safeguard
+          const mainWordsSet = new Set(wordscapesData.mainWords.map(w => w.toLowerCase()));
+          const uniqueBonusWords = Array.from(new Set(wordscapesData.bonusWords.map(w => w.toLowerCase())))
+            .filter(bw => !mainWordsSet.has(bw));
+          
+          wordscapesData.bonusWords = uniqueBonusWords;
+          result.gameData = wordscapesData;
+        }
+
         setGameData(result);
       } catch (err) {
         console.error("Failed to customize game:", err);
@@ -211,7 +223,7 @@ function GameComponent() {
   useEffect(() => {
     if (gameData && gameData.gameType?.toLowerCase().includes('wordscapes')) {
         const wordscapesData = gameData.gameData as { letters: string[], mainWords: string[], bonusWords: string[] };
-        if (foundMainWords.length > 0 && foundMainWords.length === wordscapesData.mainWords.length) {
+        if (wordscapesData.mainWords.length > 0 && foundMainWords.length === wordscapesData.mainWords.length) {
             setIsFinished(true);
         }
     }

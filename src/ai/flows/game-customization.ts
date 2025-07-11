@@ -26,7 +26,7 @@ export type CustomizeGameDifficultyInput = z.infer<
 const WordscapesRoundSchema = z.object({
     letters: z.array(z.string()).min(5).max(7).describe('An array of 5-7 letters for the user to form words from.'),
     mainWords: z.array(z.string()).describe('A list of primary words (3+ letters) for the user to find, which will be displayed in the grid.'),
-    bonusWords: z.array(z.string()).describe('An additional list of valid words (3+ letters) that can be formed but are not in the main grid.'),
+    bonusWords: z.array(z.string()).describe('An additional list of valid words (3+ letters) that can be formed but are not in the main grid. This list must not contain any words from mainWords.'),
 });
 
 const SimpleGameRoundSchema = z.object({
@@ -72,7 +72,7 @@ Based on the game type, prepare the 'gameData':
 4.  **Create Game Level:**
     *   **letters**: An array of the 5-7 letters for the wheel.
     *   **mainWords**: Select 5-8 of the most relevant or common words from the generated list. These will be the words the user needs to find to complete the level.
-    *   **bonusWords**: All other valid words from the generated list become bonus words.
+    *   **bonusWords**: All other valid words from the generated list that are NOT in \`mainWords\` become bonus words. The \`bonusWords\` list must be mutually exclusive from \`mainWords\`.
 5.  The 'gameData' field should be a single object matching the 'WordscapesRoundSchema'.
 
 **If the game is anything else (e.g., 'Drops', 'Elevate'):**

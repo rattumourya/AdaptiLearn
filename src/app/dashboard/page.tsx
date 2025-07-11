@@ -128,14 +128,14 @@ export default function DashboardPage() {
     });
 
     try {
-      const { vocabularyList } = await processDocument({ documentText: values.text });
-      console.log("Extracted Vocabulary:", vocabularyList);
+      // The processDocument flow is now primarily for validation and future complex processing.
+      // The game customization flow will handle the main logic.
+      await processDocument({ documentText: values.text });
 
       const newDoc: Document = {
         id: `doc-${Date.now()}`,
         title: values.title,
         createdAt: new Date().toISOString(),
-        contentSnippet: `${values.text.substring(0, 100)}...`,
         content: values.text,
       };
       setDocuments((prev) => [newDoc, ...prev]);
@@ -143,7 +143,7 @@ export default function DashboardPage() {
       setUploadOpen(false);
       toast({
         title: "Success!",
-        description: `Your document "${values.title}" has been added. Found ${vocabularyList.length} words.`,
+        description: `Your document "${values.title}" has been added.`,
         variant: "default",
       });
     } catch (error) {
@@ -156,6 +156,14 @@ export default function DashboardPage() {
     } finally {
       setIsProcessing(false);
     }
+  };
+  
+  const handleDeleteDocument = (docId: string) => {
+    setDocuments(prev => prev.filter(doc => doc.id !== docId));
+    toast({
+        title: "Document Removed",
+        description: "The selected document has been removed from your library.",
+    });
   };
 
   const handleGameCustomizeSubmit = async (
@@ -177,12 +185,7 @@ export default function DashboardPage() {
       
       sessionStorage.setItem('currentGameData', JSON.stringify(gameData));
       
-      const params = new URLSearchParams({
-        gameId: selectedGame.id,
-        difficulty: values.difficulty,
-      });
-
-      router.push(`/game?${params.toString()}`);
+      router.push(`/game`);
 
     } catch (error) {
       console.error("Error customizing game:", error);
@@ -217,12 +220,52 @@ export default function DashboardPage() {
             Your personal collection of documents for learning.
           </p>
         </div>
-        <Dialog open={isUploadOpen} onOpenChange={setUploadOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Upload Document
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-6">
+        {documents.map((doc) => (
+          <Card key={doc.id} className="relative group">
+            <Button 
+                variant="ghost" 
+                size="icon" 
+                className="absolute top-2 right-2 h-7 w-7 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => handleDeleteDocument(doc.id)}
+            >
+                <X className="h-4 w-4"/>
+                <span className="sr-only">Delete document</span>
             </Button>
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <FileText className="h-8 w-8 text-primary" />
+                <Badge variant="outline">
+                  {formatDistanceToNow(new Date(doc.createdAt), {
+                    addSuffix: true,
+                  })}
+                </Badge>
+              </div>
+              <CardTitle className="font-headline pt-4">{doc.title}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground line-clamp-3">
+                {doc.content}
+              </p>
+            </CardContent>
+            <CardFooter>
+              <Button className="w-full" onClick={() => openGameSelection(doc)}>
+                <Gamepad2 className="mr-2 h-4 w-4" />
+                Play Games
+              </Button>
+            </CardFooter>
+          </Card>
+        ))}
+         <Dialog open={isUploadOpen} onOpenChange={setUploadOpen}>
+          <DialogTrigger asChild>
+             <Card className="flex cursor-pointer items-center justify-center border-2 border-dashed bg-transparent transition-all hover:shadow-lg">
+                <div className="flex flex-col items-center p-8 text-center">
+                    <PlusCircle className="h-12 w-12 text-muted-foreground" />
+                    <span className="mt-2 text-sm font-medium text-muted-foreground">Add New Document</span>
+                </div>
+            </Card>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[625px]">
             <DialogHeader>
@@ -302,44 +345,6 @@ export default function DashboardPage() {
             </Form>
           </DialogContent>
         </Dialog>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-6">
-        {documents.map((doc) => (
-          <Card key={doc.id}>
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <FileText className="h-8 w-8 text-primary" />
-                <Badge variant="outline">
-                  {formatDistanceToNow(new Date(doc.createdAt), {
-                    addSuffix: true,
-                  })}
-                </Badge>
-              </div>
-              <CardTitle className="font-headline pt-4">{doc.title}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                {doc.contentSnippet}
-              </p>
-            </CardContent>
-            <CardFooter>
-              <Button className="w-full" onClick={() => openGameSelection(doc)}>
-                <Gamepad2 className="mr-2 h-4 w-4" />
-                Play Games
-              </Button>
-            </CardFooter>
-          </Card>
-        ))}
-        <Card 
-            className="flex cursor-pointer items-center justify-center border-2 border-dashed bg-transparent transition-all hover:shadow-lg"
-            onClick={() => setUploadOpen(true)}
-        >
-            <div className="flex flex-col items-center p-8 text-center">
-                <PlusCircle className="h-12 w-12 text-muted-foreground" />
-                <span className="mt-2 text-sm font-medium text-muted-foreground">Add New Document</span>
-            </div>
-        </Card>
       </div>
 
       {/* Game Selection Modal */}

@@ -54,7 +54,7 @@ const Honeycomb = ({
   onLetterClick: (letter: string) => void;
   onShuffle: () => void;
 }) => {
-  const outerLetters = letters.filter((l) => l !== centerLetter);
+  const outerLetters = useMemo(() => letters.filter((l) => l.toLowerCase() !== centerLetter.toLowerCase()), [letters, centerLetter]);
 
   const positions = [
     { top: '0%', left: '50%' },     // Top
@@ -300,14 +300,8 @@ function GameComponent() {
   useEffect(() => {
     const gameId = searchParams.get("gameId");
     const difficultyParam = searchParams.get("difficulty");
-
-    if (!gameId || !difficultyParam) {
-      setError("Missing game information. Please go back and select a game.");
-      setIsLoading(false);
-      return;
-    }
-    
     const storedGameData = sessionStorage.getItem("currentGameData");
+
     if (!storedGameData) {
       setError("Could not load game data. Please try creating a new game from the dashboard.");
       setIsLoading(false);
@@ -316,16 +310,19 @@ function GameComponent() {
 
     try {
       const parsedGameData: CustomizeGameDifficultyOutput = JSON.parse(storedGameData);
-      const foundGame = MOCK_GAMES.find((g) => g.id === gameId);
+      
+      const gameName = parsedGameData.gameType;
+      const foundGame = MOCK_GAMES.find((g) => g.name.toLowerCase() === gameName.toLowerCase());
 
       if (!foundGame) {
-        setError("Could not find the selected game.");
+        setError("Could not find the selected game type.");
         setIsLoading(false);
         return;
       }
       
       setGame(foundGame);
-      setDifficulty(difficultyParam);
+      // Difficulty might not always be in params, it's part of the generated game
+      // setDifficulty(difficultyParam);
 
       // Safeguard for Word Puzzle games
       if (parsedGameData.gameType && ['wordscapes', 'word cookies', 'spelling bee (nyt)'].includes(parsedGameData.gameType.toLowerCase())) {
@@ -350,7 +347,7 @@ function GameComponent() {
           const uniqueBonusWords = Array.from(new Set(validBonusWords.map(w => w.toLowerCase())))
             .filter(bw => !validMainWordsSet.has(bw));
           
-          wordPuzzleData.mainWords = validMainWords;
+          wordPuzzleData.mainWords = Array.from(new Set(validMainWords.map(w => w.toLowerCase())));
           wordPuzzleData.bonusWords = uniqueBonusWords;
           parsedGameData.gameData = wordPuzzleData;
 
@@ -376,6 +373,35 @@ function GameComponent() {
       setIsLoading(false);
     }
   }, [searchParams, toast]);
+  
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    if (!gameData || !isWordPuzzleGame || isFinished) return;
+    
+    const key = event.key.toLowerCase();
+    
+    // For spelling bee
+    if (gameData?.gameType?.toLowerCase().includes('spelling bee')) {
+        const wordPuzzleData = gameData.gameData as { letters: string[] };
+        const allowedLetters = wordPuzzleData.letters.map(l => l.toLowerCase());
+        
+        if (allowedLetters.includes(key)) {
+            setUserAnswer(prev => prev + key);
+        } else if (key === 'backspace') {
+            setUserAnswer(prev => prev.slice(0, -1));
+        } else if (key === 'enter') {
+            event.preventDefault();
+            handleSubmitAnswer('enter-key-submit');
+        }
+    }
+  }, [gameData, isWordPuzzleGame, isFinished]);
+  
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleKeyDown]);
+
 
   useEffect(() => {
     if (!gameData || isLoading || isFinished) return;
@@ -405,13 +431,23 @@ function GameComponent() {
     if (!gameData) return;
     setIsHintLoading(true);
 
+    let contextWord = "the game words";
+    if (isWordPuzzleGame) {
+        const wordPuzzleData = gameData.gameData as { mainWords: string[] };
+        const unfoundWords = wordPuzzleData.mainWords.filter(
+            w => !foundMainWords.includes(w.toLowerCase())
+        );
+        if (unfoundWords.length > 0) {
+            contextWord = `one of these words: ${unfoundWords.slice(0, 10).join(', ')}`;
+        }
+    }
+    
     const documentContent = sessionStorage.getItem("game_document_content") || "No context available.";
-    const currentWord = "the game words"; // Simplified for now
     
     try {
       const result = await generateHint({
         documentContext: documentContent,
-        word: currentWord,
+        word: contextWord,
       });
       toast({
         title: "Hint",
@@ -522,7 +558,7 @@ function GameComponent() {
     if (typeof e !== 'string') e.preventDefault();
     if (!gameData || isCorrect !== null) return;
     
-    const submittedAnswer = (typeof e === 'string' ? e : userAnswer).trim().toLowerCase();
+    const submittedAnswer = (typeof e === 'string' && e !== 'enter-key-submit' ? e : userAnswer).trim().toLowerCase();
     if (!submittedAnswer) return;
 
     if (isWordPuzzleGame) {

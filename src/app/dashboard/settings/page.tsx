@@ -217,7 +217,7 @@ export default function SettingsPage() {
                     size="icon"
                     variant="outline"
                     className="absolute bottom-0 right-0 rounded-full"
-                    onClick={() => fileInputrRef.current?.click()}
+                    onClick={() => fileInputRef.current?.click()}
                     disabled={isSaving}
                   >
                     <Camera />
@@ -225,6 +225,7 @@ export default function SettingsPage() {
                   </Button>
                 </div>
                 <div className="text-center sm:text-left">
+
                   <h3 className="text-lg font-semibold">
                     {form.watch("name")}
                   </h3>

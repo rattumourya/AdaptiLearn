@@ -27,6 +27,11 @@ import {
   doc,
   serverTimestamp,
 } from "firebase/firestore";
+import * as pdfjs from "pdfjs-dist/build/pdf";
+import * as mammoth from "mammoth";
+
+// Set worker path for pdfjs
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 import { Button } from "@/components/ui/button";
 import {
@@ -70,6 +75,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { customizeGameDifficulty } from "@/ai/flows/game-customization";
+import { validateDocument } from "@/ai/flows/validate-document";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -77,7 +83,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const uploadSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters."),
-  text: z.string().min(100, "Please provide at least 100 characters of text."),
+  text: z.string().min(50, "Please provide at least 50 characters of text."),
 });
 
 const gameCustomizationSchema = z.object({
@@ -144,31 +150,63 @@ export default function DashboardPage() {
     }
   }, [user, toast]);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
-    if (file) {
-      if (file.type === "text/plain") {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const text = e.target?.result as string;
-          uploadForm.setValue("text", text);
-          if (!uploadForm.getValues("title")) {
-            uploadForm.setValue("title", file.name.replace(/\.[^/.]+$/, ""));
-          }
-        };
-        reader.readAsText(file);
-      } else {
-        toast({
-          title: "Unsupported File Type",
-          description: "Please upload a .txt file.",
-          variant: "destructive",
-        });
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
+    if (!file) return;
+
+    setIsProcessing(true);
+    const { id: toastId, update } = toast({
+      title: "Reading file...",
+      description: "Extracting text from your document.",
+    });
+
+    try {
+      let text = "";
+      if (file.type === "application/pdf") {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjs.getDocument(arrayBuffer).promise;
+        const numPages = pdf.numPages;
+        for (let i = 1; i <= numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          text += content.items.map((item: any) => item.str).join(" ");
         }
+      } else if (
+        file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      ) {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        text = result.value;
+      } else if (file.type === "text/plain") {
+        text = await file.text();
+      } else {
+        throw new Error("Unsupported file type. Please upload a PDF, DOCX, or TXT file.");
+      }
+
+      uploadForm.setValue("text", text);
+      if (!uploadForm.getValues("title")) {
+        uploadForm.setValue("title", file.name.replace(/\.[^/.]+$/, ""));
+      }
+      update({ id: toastId, title: "File read successfully!", description: "Content has been loaded into the form." });
+    } catch (error) {
+      console.error("Error processing file:", error);
+      update({
+        id: toastId,
+        title: "File Processing Failed",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+      // Reset file input to allow re-uploading the same file
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
       }
     }
   };
+
 
   const handleUploadSubmit = async (values: z.infer<typeof uploadSchema>) => {
     if (!user) {
@@ -180,12 +218,22 @@ export default function DashboardPage() {
       return;
     }
     setIsProcessing(true);
-    const { id: toastId } = toast({
+    const { id: toastId, update } = toast({
       title: "Processing document...",
-      description: "Saving your document to the cloud.",
+      description: "Validating content with AI.",
     });
 
     try {
+      // Step 1: Validate content with AI
+      const validationResult = await validateDocument({ documentText: values.text });
+
+      if (!validationResult.isValid) {
+          throw new Error(validationResult.reason || "The provided content is not suitable for generating a game.");
+      }
+      
+      update({ id: toastId, description: "Validation successful. Saving your document." });
+
+      // Step 2: Add document to Firestore
       await addDoc(collection(db, "documents"), {
         userId: user.uid,
         title: values.title,
@@ -195,7 +243,7 @@ export default function DashboardPage() {
 
       uploadForm.reset();
       setUploadOpen(false);
-      toast({
+      update({
         id: toastId,
         title: "Success!",
         description: `Your document "${values.title}" has been added.`,
@@ -203,7 +251,7 @@ export default function DashboardPage() {
       });
     } catch (error) {
       console.error("Error adding document:", error);
-      toast({
+      update({
         id: toastId,
         title: "Upload Failed",
         description: (error as Error).message || "There was an error saving your document.",
@@ -266,7 +314,6 @@ export default function DashboardPage() {
         sessionStorage.setItem("currentGameResultId", gameResultRef.id);
       }
       
-      dismiss(toastId);
       router.push(`/game`);
 
     } catch (error) {
@@ -318,7 +365,7 @@ export default function DashboardPage() {
            <Sparkles className="h-4 w-4" />
            <AlertTitle>Welcome to AdaptiLearn!</AlertTitle>
            <AlertDescription>
-             You don't have any documents yet. Add your first one by clicking the card below to start creating personalized games.
+             You don&apos;t have any documents yet. Add your first one by clicking the card below to start creating personalized games.
            </AlertDescription>
          </Alert>
        )}
@@ -393,7 +440,7 @@ export default function DashboardPage() {
               <DialogHeader>
                 <DialogTitle>Add New Document</DialogTitle>
                 <DialogDescription>
-                  Upload a file or paste text to create a new learning set.
+                  Upload a file (PDF, DOCX, TXT) or paste text to create a new learning set.
                 </DialogDescription>
               </DialogHeader>
               <Form {...uploadForm}>
@@ -407,7 +454,7 @@ export default function DashboardPage() {
                       ref={fileInputRef}
                       onChange={handleFileChange}
                       className="hidden"
-                      accept=".txt"
+                      accept=".txt,.pdf,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                       disabled={isProcessing}
                     />
                     <Button
@@ -417,7 +464,7 @@ export default function DashboardPage() {
                       disabled={isProcessing}
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      <UploadCloud className="mr-2" /> Upload File (.txt)
+                      <UploadCloud className="mr-2" /> Upload File (PDF, DOCX, TXT)
                     </Button>
                     <div className="relative">
                       <div className="absolute inset-0 flex items-center">
@@ -455,7 +502,7 @@ export default function DashboardPage() {
                         <FormLabel>Content</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="Paste your document content here..."
+                            placeholder="Paste your document content here, or upload a file to populate this field."
                             className="min-h-[200px]"
                             {...field}
                             disabled={isProcessing}
@@ -487,7 +534,7 @@ export default function DashboardPage() {
           <DialogHeader>
             <DialogTitle>Select a Game</DialogTitle>
             <DialogDescription>
-              Choose a game to play with words from "{selectedDoc?.title}".
+              Choose a game to play with words from &quot;{selectedDoc?.title}&quot;.
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[70vh] p-1">

@@ -46,12 +46,11 @@ export default function ResultsPage() {
     if (user) {
       setIsLoading(true);
       const resultsRef = collection(db, "gameResults");
-      // Simplified query to avoid composite index requirement.
-      // We will filter for completed games on the client-side.
+      // Query only by userId to avoid needing a composite index.
+      // Filtering and sorting will be done on the client.
       const q = query(
         resultsRef,
-        where("userId", "==", user.uid),
-        orderBy("completedAt", "desc")
+        where("userId", "==", user.uid)
       );
 
       const unsubscribe = onSnapshot(
@@ -62,7 +61,11 @@ export default function ResultsPage() {
               id: doc.id,
               ...doc.data(),
             }))
-            .filter(result => result.status === 'completed') as GameResult[];
+            // Filter for completed games on the client
+            .filter(result => result.status === 'completed' && result.completedAt)
+            // Sort by completion date on the client
+            .sort((a, b) => b.completedAt.toMillis() - a.completedAt.toMillis()) as GameResult[];
+            
           setResults(userResults);
           setIsLoading(false);
         },

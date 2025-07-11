@@ -96,7 +96,7 @@ Based on the game type, prepare the 'gameData':
 **If the game is 'Drops' or 'Elevate':**
 1.  **Analyze and Extract:** Analyze the document to extract a list of 15-20 key vocabulary words and their definitions/context, suitable for the desired difficulty.
 2.  **Create 5-Minute Session:** Generate an array of approximately 20-25 varied mini-game rounds that can be completed in a 5-minute session. The goal is rapid-fire engagement.
-3.  **Vary Mini-Games:** The generated array should be a mix of the following schemas: 'SimpleGameRoundSchema', 'MultipleChoiceRoundSchema', and 'TrueFalseRoundSchema'.
+3.  **Vary Mini-Games:** The generated array should be a mix of the following schemas: (\`SimpleGameRoundSchema\`), (\`MultipleChoiceRoundSchema\`), and (\`TrueFalseRoundSchema\`).
     *   For **'unscramble'** (\`SimpleGameRoundSchema\`): Pick a word, scramble it, and set the prompt to "Unscramble the letters."
     *   For **'multiple-choice'** (\`MultipleChoiceRoundSchema\`): Use a word's definition as the 'question'. The 'options' should be four words, one of which is correct. The other three should be plausible but incorrect distractors from the document.
     *   For **'true-false'** (\`TrueFalseRoundSchema\`): Create a statement like "'{word}' means '{definition}'". Randomly make the definition correct or incorrect (from another word in the document).
@@ -111,9 +111,24 @@ const customizeGameDifficultyFlow = ai.defineFlow(
     inputSchema: CustomizeGameDifficultyInputSchema,
     outputSchema: CustomizeGameDifficultyOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
+  async (input) => {
+    let attempts = 0;
+    while (attempts < 2) {
+      try {
+        const {output} = await prompt(input);
+        return output!;
+      } catch (error: any) {
+        attempts++;
+        if (attempts >= 2) {
+          console.error("AI call failed after multiple attempts:", error);
+          throw new Error("The AI model is currently overloaded. Please try again in a few moments.");
+        }
+        console.log("AI call failed, retrying...", error.message);
+        // Wait for a second before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    // This part should be unreachable, but it satisfies TypeScript's need for a return path.
+    throw new Error("Failed to get a response from the AI model.");
   }
 );
-

@@ -187,8 +187,8 @@ const WordGrid = ({ words, foundWords }: { words: string[], foundWords: string[]
 
     return (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-2 my-4 p-4 bg-muted/50 rounded-lg">
-            {sortedWords.map(word => (
-                <div key={word} className="flex items-center gap-2">
+            {sortedWords.map((word, wordIndex) => (
+                <div key={`${word}-${wordIndex}`} className="flex items-center gap-2">
                     {word.split('').map((letter, index) => (
                         <div key={`${word}-${index}`} className="flex items-center justify-center h-8 w-8 rounded bg-background border-2">
                              <span className={`text-xl font-bold uppercase transition-opacity ${foundWords.includes(word) ? 'opacity-100' : 'opacity-0'}`}>

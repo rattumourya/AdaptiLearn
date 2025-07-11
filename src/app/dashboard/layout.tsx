@@ -1,4 +1,6 @@
 
+"use client";
+
 import Header from "@/components/header";
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
 import { BarChart3, Library } from "lucide-react";

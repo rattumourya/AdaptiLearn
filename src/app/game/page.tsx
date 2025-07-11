@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState, Suspense, useCallback } from "react";
+import { useEffect, useState, Suspense, useCallback, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   Card,
@@ -142,14 +142,16 @@ const WordGrid = ({ words, foundWords }: { words: string[], foundWords: string[]
 };
 
 const WordCollection = ({ words, foundWords }: { words: string[], foundWords: string[] }) => {
-    const groupedWords = words.reduce((acc, word) => {
-        const len = word.length;
-        if (!acc[len]) {
-            acc[len] = [];
-        }
-        acc[len].push(word);
-        return acc;
-    }, {} as Record<number, string[]>);
+    const groupedWords = useMemo(() => {
+      return words.reduce((acc, word) => {
+          const len = word.length;
+          if (!acc[len]) {
+              acc[len] = [];
+          }
+          acc[len].push(word);
+          return acc;
+      }, {} as Record<number, string[]>);
+    }, [words]);
 
     return (
         <div className="flex flex-wrap justify-center gap-4 my-4 p-4 bg-muted/50 rounded-lg">
@@ -760,3 +762,5 @@ export default function GamePage() {
     </Suspense>
   );
 }
+
+    

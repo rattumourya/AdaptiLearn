@@ -1,7 +1,7 @@
 // src/app/dashboard/settings/page.tsx
 "use client";
 
-import { useState } from "react";
+import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -36,8 +36,8 @@ const profileSchema = z.object({
 
 export default function SettingsPage() {
   const { toast } = useToast();
-  const [isSaving, setIsSaving] = useState(false);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [avatarPreview, setAvatarPreview] = React.useState<string | null>(
     "https://placehold.co/100x100.png"
   );
   const fileInputRef = React.useRef<HTMLInputElement>(null);

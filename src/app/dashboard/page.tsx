@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { formatDistanceToNow } from "date-fns";
@@ -71,6 +72,7 @@ const gameCustomizationSchema = z.object({
 });
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [documents, setDocuments] = useState<Document[]>(MOCK_DOCUMENTS);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
@@ -102,10 +104,6 @@ export default function DashboardPage() {
           if (!uploadForm.getValues('title')) {
             uploadForm.setValue('title', file.name.replace(/\.[^/.]+$/, ""));
           }
-          toast({
-            title: "File content loaded",
-            description: "The content of your file has been pasted into the text area.",
-          });
         };
         reader.readAsText(file);
       } else {
@@ -173,10 +171,21 @@ export default function DashboardPage() {
       });
       console.log("Customized Game Parameters:", result.customizedParameters);
       setGameCustomizeOpen(false);
-      toast({
-        title: `Game Ready: ${selectedGame.name}`,
-        description: `Your customized game is ready to play at ${values.difficulty} difficulty.`,
-      });
+      
+      const docId = selectedDoc.id;
+      const gameId = selectedGame.id;
+      const difficulty = values.difficulty;
+
+      // Find the full document to pass to the game page
+      const documentToPlay = documents.find(doc => doc.id === docId);
+      
+      // Store document content in session storage to pass to game page
+      if (documentToPlay) {
+        sessionStorage.setItem('game_document_content', documentToPlay.content);
+      }
+
+      router.push(`/game?docId=${docId}&gameId=${gameId}&difficulty=${difficulty}`);
+
     } catch (error) {
       console.error("Error customizing game:", error);
       toast({
@@ -184,9 +193,8 @@ export default function DashboardPage() {
         description: "Could not generate a custom game.",
         variant: "destructive",
       });
-    } finally {
-      setIsProcessing(false);
-    }
+       setIsProcessing(false);
+    } 
   };
 
   const openGameSelection = (doc: Document) => {
@@ -322,16 +330,16 @@ export default function DashboardPage() {
             </CardFooter>
           </Card>
         ))}
-         <Card className="flex items-center justify-center border-2 border-dashed bg-transparent">
-            <Dialog open={isUploadOpen} onOpenChange={setUploadOpen}>
-                <DialogTrigger asChild>
-                    <Button variant="ghost" className="flex flex-col h-auto p-8">
+        <Dialog open={isUploadOpen} onOpenChange={setUploadOpen}>
+            <DialogTrigger asChild>
+                <Card className="flex cursor-pointer items-center justify-center border-2 border-dashed bg-transparent transition-all hover:shadow-lg">
+                    <div className="flex flex-col items-center p-8 text-center">
                         <PlusCircle className="h-12 w-12 text-muted-foreground" />
                         <span className="mt-2 text-sm font-medium text-muted-foreground">Add New Document</span>
-                    </Button>
-                </DialogTrigger>
-            </Dialog>
-        </Card>
+                    </div>
+                </Card>
+            </DialogTrigger>
+        </Dialog>
       </div>
 
       {/* Game Selection Modal */}
@@ -418,3 +426,5 @@ export default function DashboardPage() {
     </>
   );
 }
+
+    

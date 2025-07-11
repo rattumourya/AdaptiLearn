@@ -62,14 +62,25 @@ export default function SettingsPage() {
     if (user) {
       const fetchUserData = async () => {
         const userDocRef = doc(db, "users", user.uid);
-        const userDocSnap = await getDoc(userDocRef);
-        if (userDocSnap.exists()) {
+        const userDocSnap = await getDoc(userDocRef).catch((error) => {
+          console.error("Firestore read failed:", error);
+          return null; // Handle case where Firestore might be offline/unreachable
+        });
+        
+        if (userDocSnap && userDocSnap.exists()) {
           const userData = userDocSnap.data();
           form.reset({
-            name: userData.name || "",
-            email: userData.email || "",
+            name: userData.name || user.name || "",
+            email: userData.email || user.email || "",
           });
-          setAvatarPreview(userData.photoURL || null);
+          setAvatarPreview(userData.photoURL || user.photoURL || null);
+        } else {
+          // Fallback to auth data if Firestore doc doesn't exist
+          form.reset({
+            name: user.name || "",
+            email: user.email || "",
+          });
+          setAvatarPreview(user.photoURL || null);
         }
       };
       fetchUserData();
@@ -116,10 +127,12 @@ export default function SettingsPage() {
 
       // Update user profile in Firestore
       const userDocRef = doc(db, "users", user.uid);
-      await updateDoc(userDocRef, {
+      // Use setDoc with merge:true to create or update
+      await setDoc(userDocRef, {
         name: values.name,
-        photoURL: photoURL,
-      });
+        photoURL: photoURL || null,
+        email: values.email,
+      }, { merge: true });
 
       toast({
         title: "Profile Updated",
@@ -163,7 +176,7 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto grid max-w-4xl gap-6">
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight font-headline">Settings</h1>
+        <h1 className="font-headline text-3xl font-bold tracking-tight">Settings</h1>
         <p className="text-muted-foreground">
           Manage your account settings and profile information.
         </p>
@@ -204,7 +217,7 @@ export default function SettingsPage() {
                     size="icon"
                     variant="outline"
                     className="absolute bottom-0 right-0 rounded-full"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => fileInputrRef.current?.click()}
                     disabled={isSaving}
                   >
                     <Camera />

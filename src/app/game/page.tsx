@@ -156,8 +156,8 @@ const WordCollection = ({ words, foundWords }: { words: string[], foundWords: st
                 <div key={len} className="flex flex-col items-center">
                     <h3 className="font-bold text-lg mb-2">{len} Letters</h3>
                     <div className="flex flex-col gap-2">
-                        {groupedWords[len as any].map(word => (
-                             <div key={word} className="px-4 py-2 rounded bg-background border-2 text-center min-w-[120px]">
+                        {groupedWords[len as any].map((word, index) => (
+                             <div key={`${word}-${index}`} className="px-4 py-2 rounded bg-background border-2 text-center min-w-[120px]">
                                  <span className={`text-lg font-semibold uppercase tracking-widest transition-opacity ${foundWords.includes(word) ? 'opacity-100' : 'opacity-25'}`}>
                                     {foundWords.includes(word) ? word : "•".repeat(word.length)}
                                  </span>

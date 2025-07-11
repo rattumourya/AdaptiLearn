@@ -88,7 +88,7 @@ Based on the game type, prepare the 'gameData':
 3.  **Generate Word List:** From the chosen 5-7 letters, find ALL possible valid English words of 3 or more letters.
 4.  **Create Game Level:**
     *   **letters**: An array of the 5-7 letters for the wheel.
-    *   **mainWords**: Select 5-8 of the most relevant or common words from the generated list. These will be the words the user needs to find to complete the level.
+    *   **mainWords**: Select 5-12 of the most relevant or common words from the generated list, ensuring a good mix of word lengths. These will be the words the user needs to find to complete the level.
     *   **bonusWords**: All other valid words from the generated list that are NOT in \`mainWords\` become bonus words. The \`bonusWords\` list must be mutually exclusive from \`mainWords\`.
 5.  The 'gameData' field should be a single object matching the 'WordscapesRoundSchema'.
 

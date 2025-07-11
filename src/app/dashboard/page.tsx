@@ -169,7 +169,7 @@ export default function DashboardPage() {
         gameType: selectedGame.name,
         desiredDifficulty: values.difficulty,
       });
-      console.log("Customized Game Parameters:", result.customizedParameters);
+      console.log("Customized Game Parameters:", result);
       setGameCustomizeOpen(false);
       
       const docId = selectedDoc.id;
@@ -392,7 +392,7 @@ export default function DashboardPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Difficulty Level</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isProcessing}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select a difficulty" />
@@ -410,7 +410,7 @@ export default function DashboardPage() {
                 />
                 <DialogFooter>
                     <DialogClose asChild>
-                        <Button type="button" variant="outline" onClick={() => setGameCustomizeOpen(false)}>
+                        <Button type="button" variant="outline" onClick={() => setGameCustomizeOpen(false)} disabled={isProcessing}>
                             Cancel
                         </Button>
                     </DialogClose>
@@ -426,5 +426,3 @@ export default function DashboardPage() {
     </>
   );
 }
-
-    

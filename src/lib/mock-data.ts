@@ -1,8 +1,6 @@
 
 import type { Game } from './types';
 
-// Document mock data is no longer needed as it's fetched from Firestore.
-
 export const MOCK_GAMES: Game[] = [
   {
     id: 'game-1',
@@ -10,6 +8,7 @@ export const MOCK_GAMES: Game[] = [
     description: 'A dynamic, 5-minute session with varied mini-games to rapidly boost vocabulary from your document.',
     improves: ['Recall', 'Spelling', 'Context'],
     supportedCategories: [], // Empty means it supports ALL categories
+    isPlayable: true,
   },
   {
     id: 'game-2',
@@ -17,6 +16,7 @@ export const MOCK_GAMES: Game[] = [
     description: 'Unscramble key formulas and equations from your document. A great way to test your memory of core principles.',
     improves: ['Recall', 'Logic', 'Pattern Recognition'],
     supportedCategories: ["Mathematics", "Science", "Engineering"],
+    isPlayable: true,
   },
   {
     id: 'game-3',
@@ -24,6 +24,7 @@ export const MOCK_GAMES: Game[] = [
     description: 'Type the missing pieces of code snippets taken directly from your notes or files. Perfect for syntax practice.',
     improves: ['Spelling', 'Syntax', 'Memory'],
     supportedCategories: ["Computer Science & Coding"],
+    isPlayable: false,
   },
   {
     id: 'game-4',
@@ -31,7 +32,6 @@ export const MOCK_GAMES: Game[] = [
     description: 'Place key events, dates, and figures in the correct chronological order based on your history text.',
     improves: ['Recall', 'Sequencing', 'History'],
     supportedCategories: ["History & Social Science"],
+    isPlayable: true,
   },
 ];
-
-    

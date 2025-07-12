@@ -20,7 +20,8 @@ import {
   FlaskConical,
   Landmark,
   Sigma,
-  Languages
+  Languages,
+  Wrench, // Added for Engineering
 } from "lucide-react";
 import {
   collection,
@@ -103,7 +104,7 @@ const categoryIcons: { [key: string]: React.ElementType } = {
   "History & Social Science": Landmark,
   "Mathematics": Sigma,
   "Computer Science & Coding": Code,
-  "Engineering": FlaskConical, // Or another icon
+  "Engineering": Wrench,
   "Language Learning & Literature": Languages,
   "General & Other": Book,
 }
@@ -381,8 +382,7 @@ export default function DashboardPage() {
   };
 
   const openGameCustomization = (game: Game) => {
-    // A real implementation would check if the game is playable
-    if (!['game-1', 'game-2'].includes(game.id)) {
+    if (!game.isPlayable) {
       toast({ title: "Coming Soon!", description: `The game "${game.name}" is not yet implemented.`});
       return;
     }
@@ -392,20 +392,19 @@ export default function DashboardPage() {
   };
 
   const getSafeDate = (timestamp: any): Date => {
+    if (!timestamp) return new Date();
     if (timestamp instanceof Timestamp) {
       return timestamp.toDate();
     }
     if (timestamp && typeof timestamp.seconds === 'number') {
       return new Date(timestamp.seconds * 1000);
     }
-    // Fallback for potentially already converted string dates
     if (typeof timestamp === 'string') {
         const date = new Date(timestamp);
         if (!isNaN(date.getTime())) {
             return date;
         }
     }
-    // Final fallback
     return new Date();
   };
 

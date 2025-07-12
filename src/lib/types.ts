@@ -17,6 +17,7 @@ export interface Game {
   improves: string[];
   // An array of categories this game is suitable for. Empty means suitable for all.
   supportedCategories: string[];
+  isPlayable: boolean;
 }
 
 export interface UserProfile {
@@ -26,5 +27,3 @@ export interface UserProfile {
     photoURL?: string;
     createdAt?: string;
 }
-
-    

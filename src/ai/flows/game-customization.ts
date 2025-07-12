@@ -75,6 +75,13 @@ const FormulaScrambleRoundSchema = z.object({
     displayPrompt: z.string().describe("The prompt to show the user, e.g., 'Unscramble the formula.'"),
 });
 
+const TimelineTeaserRoundSchema = z.object({
+    miniGameType: z.enum(['timeline-teaser']).describe("The type of this mini-game round."),
+    correctOrder: z.array(z.string()).describe("An array of events or items in the correct chronological order."),
+    scrambledOrder: z.array(z.string()).describe("An array of the same events, but shuffled, for the user to sort."),
+    displayPrompt: z.string().describe("The prompt to show the user, e.g., 'Arrange the events in the correct order.'"),
+});
+
 
 // Union schema for all possible game rounds
 const GameRoundSchema = z.union([
@@ -84,6 +91,7 @@ const GameRoundSchema = z.union([
     TraceOrTypeRoundSchema,
     TrueFalseChallengeRoundSchema,
     FormulaScrambleRoundSchema,
+    TimelineTeaserRoundSchema,
 ]);
 
 const CustomizeGameDifficultyOutputSchema = z.object({
@@ -135,7 +143,7 @@ const prompt = ai.definePrompt({
 - Desired Game Type: **{{{gameType}}}**
 - Desired Difficulty: **{{{desiredDifficulty}}}**
 
-**Objective:** Generate a list of 10-15 themed, rapid-fire mini-game rounds. The vocabulary, concepts, and complexity must align with the document category, game type, and difficulty.
+**Objective:** Generate a list of 5-10 themed, rapid-fire mini-game rounds. The vocabulary, concepts, and complexity must align with the document category, game type, and difficulty.
 
 ---
 
@@ -154,6 +162,15 @@ const prompt = ai.definePrompt({
         *   **Hard:** Use longer, more complex formulas (6+ parts) and break them into smaller, trickier pieces.
     *   **Scrambling:** For each formula, break it into its logical components (variables, operators, numbers, functions) and provide these as the 'scrambledParts' array. Ensure the array is shuffled. Example: for "E = mc^2", the parts could be ["E", "=", "m", "c^2"].
 
+*   **If Game Type is "Timeline Teaser":**
+    *   **This is the ONLY game type to generate.** The 'gameData' array should only contain 'timeline-teaser' rounds.
+    *   **Extraction:** Identify 5-10 sets of related historical events, figures, or steps in a process from the document that have a clear chronological order.
+    *   **Difficulty Scaling for Timelines:**
+        *   **Easy:** Use a small number of items (3-4) that are widely separated in time or sequence (e.g., "Stone Age", "Roman Empire", "World War II").
+        *   **Medium:** Use 4-5 items that are closer together or require more specific knowledge (e.g., key battles within a single war).
+        *   **Hard:** Use 5-6 items that are very close in time, nuanced, or conceptually similar, requiring precise knowledge to order correctly.
+    *   **Output Format:** For each round, provide the items in the correct order in the 'correctOrder' array, and a shuffled version in the 'scrambledOrder' array.
+
 ---
 
 **GENERAL DIFFICULTY & CATEGORY RULES (for "Personalized Practice"):**
@@ -165,7 +182,7 @@ const prompt = ai.definePrompt({
 
 **Category-Specific Adjustments:**
 -   **For "Science" or "Engineering":** Focus on terminology, definitions, and processes. True/False questions should test relationships between concepts (e.g., "Photosynthesis produces carbon dioxide.").
--   **For "History" or "Social Science":** Focus on names, dates, events, and concepts. True/False questions should test factual accuracy.
+-   **For "History & Social Science":** Focus on names, dates, events, and concepts. True/False questions should test factual accuracy.
 -   **For "Computer Science & Coding":** Focus on syntax, keywords, function names, and formulas. Spelling/Typing games are very important here. Distractors should include common typos (e.g., 'functoin' vs 'function'). True/False can test logic (e.g., "A 'for' loop is a type of conditional statement.").
 -   **For "Language Learning" or "General":** Use a balanced mix of all game types.
 
@@ -173,8 +190,8 @@ const prompt = ai.definePrompt({
 
 **INSTRUCTIONS:**
 
-1.  **Analyze and Extract:** Read the document and extract key terms/formulas appropriate for the requested game type, category, and difficulty.
-2.  **Generate a Game Title:** Create a fun, encouraging title based on the game type and document (e.g., "Biology Blitz," "Calculus Formula Scramble").
+1.  **Analyze and Extract:** Read the document and extract key terms/formulas/events appropriate for the requested game type, category, and difficulty.
+2.  **Generate a Game Title:** Create a fun, encouraging title based on the game type and document (e.g., "Biology Blitz," "Calculus Formula Scramble", "American Revolution Timeline").
 3.  **Create Game Rounds:** Construct an array for 'gameData' following the specific rules for the chosen 'gameType'.
 
     *   **For Word–Image Match:**

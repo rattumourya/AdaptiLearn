@@ -67,9 +67,13 @@ function GameComponent() {
   const [streak, setStreak] = useState(0);
   const [gameResultId, setGameResultId] = useState<string | null>(null);
 
-  // Formula Scramble State
+  // --- Game-specific state ---
+  // Formula Scramble
   const [formulaAnswerParts, setFormulaAnswerParts] = useState<string[]>([]);
   const [formulaOptionParts, setFormulaOptionParts] = useState<string[]>([]);
+  // Timeline Teaser
+  const [timelineAnswerOrder, setTimelineAnswerOrder] = useState<string[]>([]);
+  const [timelineOptionItems, setTimelineOptionItems] = useState<string[]>([]);
 
 
   useEffect(() => {
@@ -91,10 +95,14 @@ function GameComponent() {
         return;
       }
       setGameData(parsedGameData);
+      // Initialize first round state
       const firstRound = parsedGameData.gameData[0];
       if (firstRound.miniGameType === 'formula-scramble') {
         setFormulaOptionParts(shuffleArray(firstRound.scrambledParts));
+      } else if (firstRound.miniGameType === 'timeline-teaser') {
+        setTimelineOptionItems(shuffleArray(firstRound.scrambledOrder));
       }
+
       setIsLoading(false);
     } catch (err) {
       console.error("Failed to parse game data from sessionStorage:", err);
@@ -152,12 +160,17 @@ function GameComponent() {
       setUserAnswer("");
       setRevealedAnswer(null);
       
-      // Reset game-specific state
+      // Reset all game-specific states
       setFormulaAnswerParts([]);
+      setTimelineAnswerOrder([]);
+      setFormulaOptionParts([]);
+      setTimelineOptionItems([]);
+
+      // Initialize state for the next round
       if(nextRound.miniGameType === 'formula-scramble') {
         setFormulaOptionParts(shuffleArray(nextRound.scrambledParts));
-      } else {
-        setFormulaOptionParts([]);
+      } else if (nextRound.miniGameType === 'timeline-teaser') {
+        setTimelineOptionItems(shuffleArray(nextRound.scrambledOrder));
       }
 
       setCurrentRoundIndex(nextRoundIndex);
@@ -180,6 +193,7 @@ function GameComponent() {
         case 'trace-or-type': return round.word;
         case 'true-false-challenge': return round.isCorrect ? 'True' : 'False';
         case 'formula-scramble': return round.correctFormula;
+        case 'timeline-teaser': return round.correctOrder.join(' → ');
         default: return '';
     }
   }
@@ -206,7 +220,7 @@ function GameComponent() {
     if (!gameData || isCorrect !== null) return;
     
     let submittedAnswer = (typeof e === 'string' ? e : userAnswer).trim().toLowerCase();
-    if (!submittedAnswer) return;
+    if (!submittedAnswer && currentRound.miniGameType !== 'timeline-teaser' && currentRound.miniGameType !== 'formula-scramble') return;
 
     const currentRound = gameData.gameData[currentRoundIndex];
     let isAnswerCorrect = false;
@@ -219,8 +233,6 @@ function GameComponent() {
             isAnswerCorrect = submittedAnswer === currentRound.word.toLowerCase();
             break;
         case 'spelling-completion':
-            isAnswerCorrect = submittedAnswer === currentRound.word.toLowerCase();
-            break;
         case 'trace-or-type':
             isAnswerCorrect = submittedAnswer === currentRound.word.toLowerCase();
             break;
@@ -229,9 +241,12 @@ function GameComponent() {
             isAnswerCorrect = submittedAnswer === expected;
             break;
         case 'formula-scramble':
-            // The formula answer is built by the drag-and-drop state, not input
-            const assembledFormula = formulaAnswerParts.join('');
+            const assembledFormula = formulaAnswerParts.join('').replace(/\s/g, '');
             isAnswerCorrect = assembledFormula.toLowerCase() === currentRound.correctFormula.replace(/\s/g, '').toLowerCase();
+            break;
+        case 'timeline-teaser':
+            const isOrderCorrect = JSON.stringify(timelineAnswerOrder) === JSON.stringify(currentRound.correctOrder);
+            isAnswerCorrect = isOrderCorrect;
             break;
     }
 
@@ -252,7 +267,7 @@ function GameComponent() {
     try {
       const result = await generateHint({
         documentContext: documentContent,
-        word: currentRound.word || currentRound.correctFormula, // Use formula as context for hint
+        word: currentRound.word || currentRound.correctFormula || "the current topic",
       });
       toast({
         title: "Hint",
@@ -281,18 +296,24 @@ function GameComponent() {
     handleIncorrectAnswer();
   };
   
-  // Formula Scramble Logic
-  const handleFormulaPartClick = (part: string, source: 'options' | 'answer') => {
+  // Generic function for sortable games (Formula, Timeline)
+  const handleSortableItemClick = (
+    part: string, 
+    source: 'options' | 'answer', 
+    sourceList: string[], 
+    setSourceList: (list: string[]) => void, 
+    destList: string[], 
+    setDestList: (list: string[]) => void
+  ) => {
       if (isCorrect !== null) return;
-
       if (source === 'options') {
         // Move from options to answer
-        setFormulaAnswerParts(prev => [...prev, part]);
-        setFormulaOptionParts(prev => prev.filter(p => p !== part));
+        setDestList([...destList, part]);
+        setSourceList(sourceList.filter(p => p !== part));
       } else {
         // Move from answer back to options
-        setFormulaOptionParts(prev => [...prev, part]);
-        setFormulaAnswerParts(prev => prev.filter(p => p !== part));
+        setSourceList([...sourceList, part]);
+        setDestList(destList.filter(p => p !== part));
       }
   }
 
@@ -467,7 +488,7 @@ function GameComponent() {
                         <div className="w-full p-4 min-h-[6rem] bg-muted/50 rounded-md flex flex-wrap items-center justify-center gap-2 font-mono text-xl">
                             {formulaAnswerParts.length > 0 ? (
                                 formulaAnswerParts.map((part, index) => (
-                                    <Button key={`${part}-${index}`} variant="secondary" onClick={() => handleFormulaPartClick(part, 'answer')} className="cursor-pointer">
+                                    <Button key={`${part}-${index}`} variant="secondary" onClick={() => handleSortableItemClick(part, 'answer', formulaAnswerParts, setFormulaAnswerParts, formulaOptionParts, setFormulaOptionParts)} className="cursor-pointer">
                                         {part}
                                     </Button>
                                 ))
@@ -479,12 +500,39 @@ function GameComponent() {
                         {/* Options Zone */}
                         <div className="w-full p-4 min-h-[6rem] bg-muted/20 rounded-md flex flex-wrap items-center justify-center gap-2 font-mono text-xl">
                              {formulaOptionParts.map((part, index) => (
-                                <Button key={`${part}-${index}`} variant="outline" onClick={() => handleFormulaPartClick(part, 'options')} className="cursor-pointer">
+                                <Button key={`${part}-${index}`} variant="outline" onClick={() => handleSortableItemClick(part, 'options', formulaOptionParts, setFormulaOptionParts, formulaAnswerParts, setFormulaAnswerParts)} className="cursor-pointer">
                                     {part}
                                 </Button>
                              ))}
                         </div>
                         <Button onClick={() => handleSubmitAnswer('submit_formula')} className="w-full max-w-sm" disabled={isCorrect !== null || formulaOptionParts.length > 0}>Submit</Button>
+                    </div>
+                )}
+
+                {currentRound.miniGameType === 'timeline-teaser' && (
+                    <div className="flex flex-col items-center gap-4 w-full">
+                        {/* Answer Drop Zone */}
+                        <div className="w-full p-4 min-h-[6rem] bg-muted/50 rounded-md flex flex-col items-center justify-center gap-2 text-base">
+                            {timelineAnswerOrder.length > 0 ? (
+                                timelineAnswerOrder.map((item, index) => (
+                                    <Button key={`${item}-${index}`} variant="secondary" onClick={() => handleSortableItemClick(item, 'answer', timelineAnswerOrder, setTimelineAnswerOrder, timelineOptionItems, setTimelineOptionItems)} className="cursor-pointer w-full text-left justify-start">
+                                        <span className="font-bold mr-2">{index + 1}.</span>{item}
+                                    </Button>
+                                ))
+                            ) : (
+                                <p className="text-sm text-muted-foreground">Arrange the events here</p>
+                            )}
+                        </div>
+
+                        {/* Options Zone */}
+                        <div className="w-full p-4 min-h-[6rem] bg-muted/20 rounded-md flex flex-col items-center justify-center gap-2 text-base">
+                             {timelineOptionItems.map((item, index) => (
+                                <Button key={`${item}-${index}`} variant="outline" onClick={() => handleSortableItemClick(item, 'options', timelineOptionItems, setTimelineOptionItems, timelineAnswerOrder, setTimelineAnswerOrder)} className="cursor-pointer w-full text-left justify-start">
+                                    {item}
+                                </Button>
+                             ))}
+                        </div>
+                        <Button onClick={() => handleSubmitAnswer('submit_timeline')} className="w-full max-w-sm" disabled={isCorrect !== null || timelineOptionItems.length > 0}>Submit</Button>
                     </div>
                 )}
             </div>

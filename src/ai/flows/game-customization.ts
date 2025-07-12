@@ -68,6 +68,13 @@ const TrueFalseChallengeRoundSchema = z.object({
     displayPrompt: z.string().describe("The prompt to show the user, e.g., 'True or False?'"),
 });
 
+const FormulaScrambleRoundSchema = z.object({
+    miniGameType: z.enum(['formula-scramble']).describe("The type of this mini-game round."),
+    correctFormula: z.string().describe("The correct, full formula or equation as a string."),
+    scrambledParts: z.array(z.string()).describe("An array of the formula's parts, broken up and shuffled."),
+    displayPrompt: z.string().describe("The prompt to show the user, e.g., 'Unscramble the formula.'"),
+});
+
 
 // Union schema for all possible game rounds
 const GameRoundSchema = z.union([
@@ -76,12 +83,13 @@ const GameRoundSchema = z.union([
     SpellingCompletionRoundSchema,
     TraceOrTypeRoundSchema,
     TrueFalseChallengeRoundSchema,
+    FormulaScrambleRoundSchema,
 ]);
 
 const CustomizeGameDifficultyOutputSchema = z.object({
     gameTitle: z.string().describe('The title for this specific game session.'),
     gameType: z.string().describe('The type of game being played, to be passed to the client.'),
-    gameData: z.array(GameRoundSchema).describe('An array of customized mini-game rounds for the 5-minute session.'),
+    gameData: z.array(GameRoundSchema).describe('An array of customized mini-game rounds for the session.'),
 });
 
 export type CustomizeGameDifficultyOutput = z.infer<
@@ -119,18 +127,36 @@ const prompt = ai.definePrompt({
   name: 'customizeGameDifficultyPrompt',
   input: {schema: CustomizeGameDifficultyInputSchema},
   output: {schema: CustomizeGameDifficultyOutputSchema},
-  prompt: `You are a senior educational game designer. Your task is to create a 5-minute learning session based on a user's document.
+  prompt: `You are a senior educational game designer. Your task is to create a learning session based on a user's document and chosen game type.
 
 **Document Analysis:**
 - Document Category: **{{{documentCategory}}}**
 - Document Text: {{{documentText}}}
+- Desired Game Type: **{{{gameType}}}**
 - Desired Difficulty: **{{{desiredDifficulty}}}**
 
-**Objective:** Generate a list of 10-15 varied, rapid-fire mini-game rounds. The vocabulary, concepts, and complexity must align with BOTH the document category and the desired difficulty level.
+**Objective:** Generate a list of 10-15 themed, rapid-fire mini-game rounds. The vocabulary, concepts, and complexity must align with the document category, game type, and difficulty.
 
 ---
 
-**DIFFICULTY & CATEGORY RULES:**
+**GAME TYPE RULES:**
+
+*   **If Game Type is "Personalized Practice":**
+    *   Generate a good variety of game types (Word-Image, Spelling, True/False, etc.).
+    *   Follow the general difficulty and category rules below.
+
+*   **If Game Type is "Formula Scramble":**
+    *   **This is the ONLY game type to generate.** The 'gameData' array should only contain 'formula-scramble' rounds.
+    *   **Extraction:** Identify 5-10 key formulas or equations from the document.
+    *   **Difficulty Scaling for Formulas:**
+        *   **Easy:** Use shorter formulas (2-4 parts).
+        *   **Medium:** Use formulas with 4-6 parts.
+        *   **Hard:** Use longer, more complex formulas (6+ parts) and break them into smaller, trickier pieces.
+    *   **Scrambling:** For each formula, break it into its logical components (variables, operators, numbers, functions) and provide these as the 'scrambledParts' array. Ensure the array is shuffled. Example: for "E = mc^2", the parts could be ["E", "=", "m", "c^2"].
+
+---
+
+**GENERAL DIFFICULTY & CATEGORY RULES (for "Personalized Practice"):**
 
 **General Difficulty Scaling:**
 -   **Easy:** Use common, shorter words (3-6 letters). Focus on core concepts. Distractors should be obviously different. For spelling, remove only 1-2 vowels.
@@ -140,35 +166,22 @@ const prompt = ai.definePrompt({
 **Category-Specific Adjustments:**
 -   **For "Science" or "Engineering":** Focus on terminology, definitions, and processes. True/False questions should test relationships between concepts (e.g., "Photosynthesis produces carbon dioxide.").
 -   **For "History" or "Social Science":** Focus on names, dates, events, and concepts. True/False questions should test factual accuracy.
--   **For "Coding" or "Math":** Focus on syntax, keywords, function names, and formulas. Spelling/Typing games are very important here. Distractors should include common typos (e.g., 'functoin' vs 'function'). True/False can test logic (e.g., "A 'for' loop is a type of conditional statement.").
+-   **For "Computer Science & Coding":** Focus on syntax, keywords, function names, and formulas. Spelling/Typing games are very important here. Distractors should include common typos (e.g., 'functoin' vs 'function'). True/False can test logic (e.g., "A 'for' loop is a type of conditional statement.").
 -   **For "Language Learning" or "General":** Use a balanced mix of all game types.
 
 ---
 
 **INSTRUCTIONS:**
 
-1.  **Analyze and Extract Vocabulary:** Read the document and extract 15-20 key terms appropriate for the requested category and difficulty.
-2.  **Generate a Game Title:** Create a fun, encouraging title (e.g., "Biology Blitz," "Code Breaker Challenge").
-3.  **Create Mixed Game Rounds:** Construct an array for 'gameData' with a good variety of game types, following the rules above.
+1.  **Analyze and Extract:** Read the document and extract key terms/formulas appropriate for the requested game type, category, and difficulty.
+2.  **Generate a Game Title:** Create a fun, encouraging title based on the game type and document (e.g., "Biology Blitz," "Calculus Formula Scramble").
+3.  **Create Game Rounds:** Construct an array for 'gameData' following the specific rules for the chosen 'gameType'.
 
-    *   **Word–Image Match:**
+    *   **For Word–Image Match:**
         *   Pick a concrete noun from the vocabulary list.
         *   For 'imageDataUri', provide a placeholder like "IMAGE_FOR_WORD_X" (e.g., "IMAGE_FOR_WORD_Mitochondria"). The system will generate the image.
-        *   For "Hard" difficulty, choose distractors that are visually or functionally similar.
 
-    *   **Word–Translation Match:**
-        *   Pick a word. Provide its correct English translation.
-        *   For "Hard" difficulty, create very plausible but incorrect 'distractorTranslations'.
-
-    *   **Spelling Completion / Trace or Type:**
-        *   Pick a word. Create its 'promptWord' according to difficulty rules.
-        *   For "Coding/Math", this is a high-value game type.
-
-    *   **True/False Challenge:**
-        *   Pick a key term from the document.
-        *   Create a factual 'statement' about that term, based on the document's context and category.
-        *   Set 'isCorrect' to true or false. 50/50 split.
-        *   For "Hard" difficulty, the statements should be nuanced and require careful reading.
+    *   **For other "Personalized Practice" games:** Follow the general difficulty and category rules.
 
 4.  **Final Output:** Ensure the 'gameType' in the output matches the input 'gameType', and 'gameData' is the array of mini-game rounds you designed.
 `,
@@ -187,15 +200,17 @@ const customizeGameDifficultyFlow = ai.defineFlow(
         const {output: structuredOutput} = await prompt(input);
         if (!structuredOutput) throw new Error("AI did not return a structured output.");
 
-        for (const round of structuredOutput.gameData) {
-          if (round.miniGameType === 'word-image-match') {
-            if (round.imageDataUri.startsWith('IMAGE_FOR_WORD_')) {
+        // Asynchronously generate images if needed
+        const imageGenerationPromises = structuredOutput.gameData
+          .filter(round => round.miniGameType === 'word-image-match' && round.imageDataUri.startsWith('IMAGE_FOR_WORD_'))
+          .map(async (round) => {
+            if (round.miniGameType === 'word-image-match') {
               const wordToGenerate = round.word;
-              const imageUrl = await generateImageForWord(wordToGenerate);
-              round.imageDataUri = imageUrl;
+              round.imageDataUri = await generateImageForWord(wordToGenerate);
             }
-          }
-        }
+          });
+
+        await Promise.all(imageGenerationPromises);
         
         return structuredOutput;
 

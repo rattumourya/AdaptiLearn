@@ -67,6 +67,11 @@ function GameComponent() {
   const [streak, setStreak] = useState(0);
   const [gameResultId, setGameResultId] = useState<string | null>(null);
 
+  // Formula Scramble State
+  const [formulaAnswerParts, setFormulaAnswerParts] = useState<string[]>([]);
+  const [formulaOptionParts, setFormulaOptionParts] = useState<string[]>([]);
+
+
   useEffect(() => {
     const storedGameData = sessionStorage.getItem("currentGameData");
     const storedResultId = sessionStorage.getItem("currentGameResultId");
@@ -86,6 +91,10 @@ function GameComponent() {
         return;
       }
       setGameData(parsedGameData);
+      const firstRound = parsedGameData.gameData[0];
+      if (firstRound.miniGameType === 'formula-scramble') {
+        setFormulaOptionParts(shuffleArray(firstRound.scrambledParts));
+      }
       setIsLoading(false);
     } catch (err) {
       console.error("Failed to parse game data from sessionStorage:", err);
@@ -95,6 +104,7 @@ function GameComponent() {
   }, []);
 
   const finishGame = useCallback(async () => {
+      if (isFinished) return; // Prevent multiple calls
       setIsFinished(true);
       if (gameResultId) {
           try {
@@ -113,7 +123,7 @@ function GameComponent() {
               });
           }
       }
-  }, [gameResultId, score, toast]);
+  }, [gameResultId, score, toast, isFinished]);
 
   useEffect(() => {
     if (isLoading || isFinished) return;
@@ -137,9 +147,19 @@ function GameComponent() {
         finishGame();
         return;
       }
+      const nextRound = gameData!.gameData[nextRoundIndex];
       setIsCorrect(null);
       setUserAnswer("");
       setRevealedAnswer(null);
+      
+      // Reset game-specific state
+      setFormulaAnswerParts([]);
+      if(nextRound.miniGameType === 'formula-scramble') {
+        setFormulaOptionParts(shuffleArray(nextRound.scrambledParts));
+      } else {
+        setFormulaOptionParts([]);
+      }
+
       setCurrentRoundIndex(nextRoundIndex);
     }, delay);
   }, [currentRoundIndex, gameData, lives, timeLeft, finishGame]);
@@ -159,6 +179,7 @@ function GameComponent() {
         case 'spelling-completion': return round.word;
         case 'trace-or-type': return round.word;
         case 'true-false-challenge': return round.isCorrect ? 'True' : 'False';
+        case 'formula-scramble': return round.correctFormula;
         default: return '';
     }
   }
@@ -184,7 +205,7 @@ function GameComponent() {
     if (typeof e !== 'string') e.preventDefault();
     if (!gameData || isCorrect !== null) return;
     
-    const submittedAnswer = (typeof e === 'string' ? e : userAnswer).trim().toLowerCase();
+    let submittedAnswer = (typeof e === 'string' ? e : userAnswer).trim().toLowerCase();
     if (!submittedAnswer) return;
 
     const currentRound = gameData.gameData[currentRoundIndex];
@@ -207,6 +228,11 @@ function GameComponent() {
             const expected = currentRound.isCorrect ? 'true' : 'false';
             isAnswerCorrect = submittedAnswer === expected;
             break;
+        case 'formula-scramble':
+            // The formula answer is built by the drag-and-drop state, not input
+            const assembledFormula = formulaAnswerParts.join('');
+            isAnswerCorrect = assembledFormula.toLowerCase() === currentRound.correctFormula.replace(/\s/g, '').toLowerCase();
+            break;
     }
 
     if (isAnswerCorrect) {
@@ -226,7 +252,7 @@ function GameComponent() {
     try {
       const result = await generateHint({
         documentContext: documentContent,
-        word: currentRound.word,
+        word: currentRound.word || currentRound.correctFormula, // Use formula as context for hint
       });
       toast({
         title: "Hint",
@@ -254,6 +280,22 @@ function GameComponent() {
     });
     handleIncorrectAnswer();
   };
+  
+  // Formula Scramble Logic
+  const handleFormulaPartClick = (part: string, source: 'options' | 'answer') => {
+      if (isCorrect !== null) return;
+
+      if (source === 'options') {
+        // Move from options to answer
+        setFormulaAnswerParts(prev => [...prev, part]);
+        setFormulaOptionParts(prev => prev.filter(p => p !== part));
+      } else {
+        // Move from answer back to options
+        setFormulaOptionParts(prev => [...prev, part]);
+        setFormulaAnswerParts(prev => prev.filter(p => p !== part));
+      }
+  }
+
 
   if (isLoading) {
     return (
@@ -311,7 +353,7 @@ function GameComponent() {
         <div className="flex justify-between items-center">
           <div>
             <CardTitle className="font-headline text-3xl">{gameData.gameTitle}</CardTitle>
-            <CardDescription>A 5-minute learning burst!</CardDescription>
+            <CardDescription>{gameData.gameType} Session</CardDescription>
           </div>
           <div className="flex items-center gap-4 text-lg">
              <div className="flex items-center gap-1.5 text-rose-500 font-semibold">
@@ -418,6 +460,33 @@ function GameComponent() {
                         </div>
                     </div>
                 )}
+
+                {currentRound.miniGameType === 'formula-scramble' && (
+                    <div className="flex flex-col items-center gap-4 w-full">
+                        {/* Answer Drop Zone */}
+                        <div className="w-full p-4 min-h-[6rem] bg-muted/50 rounded-md flex flex-wrap items-center justify-center gap-2 font-mono text-xl">
+                            {formulaAnswerParts.length > 0 ? (
+                                formulaAnswerParts.map((part, index) => (
+                                    <Button key={`${part}-${index}`} variant="secondary" onClick={() => handleFormulaPartClick(part, 'answer')} className="cursor-pointer">
+                                        {part}
+                                    </Button>
+                                ))
+                            ) : (
+                                <p className="text-sm text-muted-foreground">Assemble the formula here</p>
+                            )}
+                        </div>
+
+                        {/* Options Zone */}
+                        <div className="w-full p-4 min-h-[6rem] bg-muted/20 rounded-md flex flex-wrap items-center justify-center gap-2 font-mono text-xl">
+                             {formulaOptionParts.map((part, index) => (
+                                <Button key={`${part}-${index}`} variant="outline" onClick={() => handleFormulaPartClick(part, 'options')} className="cursor-pointer">
+                                    {part}
+                                </Button>
+                             ))}
+                        </div>
+                        <Button onClick={() => handleSubmitAnswer('submit_formula')} className="w-full max-w-sm" disabled={isCorrect !== null || formulaOptionParts.length > 0}>Submit</Button>
+                    </div>
+                )}
             </div>
         </CardContent>
     );
@@ -462,5 +531,3 @@ export default function GamePage() {
     </Suspense>
   );
 }
-
-    

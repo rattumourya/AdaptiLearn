@@ -382,7 +382,7 @@ export default function DashboardPage() {
 
   const openGameCustomization = (game: Game) => {
     // A real implementation would check if the game is playable
-    if (game.id !== 'game-1') {
+    if (!['game-1', 'game-2'].includes(game.id)) {
       toast({ title: "Coming Soon!", description: `The game "${game.name}" is not yet implemented.`});
       return;
     }
@@ -398,7 +398,15 @@ export default function DashboardPage() {
     if (timestamp && typeof timestamp.seconds === 'number') {
       return new Date(timestamp.seconds * 1000);
     }
-    return new Date(timestamp as string);
+    // Fallback for potentially already converted string dates
+    if (typeof timestamp === 'string') {
+        const date = new Date(timestamp);
+        if (!isNaN(date.getTime())) {
+            return date;
+        }
+    }
+    // Final fallback
+    return new Date();
   };
 
   const filteredGames = useMemo(() => {
@@ -729,5 +737,3 @@ export default function DashboardPage() {
     </>
   );
 }
-
-    

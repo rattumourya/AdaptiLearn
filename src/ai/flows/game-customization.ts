@@ -121,7 +121,7 @@ const generateImageForWord = ai.defineFlow(
     async (word) => {
         const {media} = await ai.generate({
             model: 'googleai/gemini-2.0-flash-preview-image-generation',
-            prompt: `Generate a clean, simple, vector-style image of a "${word}" on a plain white background, suitable for a language learning app. The image should be clear and easily recognizable.`,
+            prompt: `Generate a vibrant, clean, flat illustration of a "${word}", suitable for a modern educational app. The image should be clear, easily recognizable, and visually engaging.`,
             config: {
                 responseModalities: ['TEXT', 'IMAGE'],
             },
@@ -244,3 +244,5 @@ const customizeGameDifficultyFlow = ai.defineFlow(
     throw new Error("Failed to get a response from the AI model.");
   }
 );
+
+    

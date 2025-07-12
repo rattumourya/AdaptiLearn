@@ -382,10 +382,6 @@ export default function DashboardPage() {
   };
 
   const openGameCustomization = (game: Game) => {
-    if (!game.isPlayable) {
-      toast({ title: "Coming Soon!", description: `The game "${game.name}" is not yet implemented.`});
-      return;
-    }
     setSelectedGame(game);
     setGameCustomizeOpen(true);
     setGameSelectOpen(false);
@@ -410,8 +406,11 @@ export default function DashboardPage() {
 
   const filteredGames = useMemo(() => {
     if (!selectedDoc) return [];
-    return MOCK_GAMES.filter(game => {
-      // If a game supports all categories, or the document's category is included
+    // Filter out games that are not yet playable
+    const playableGames = MOCK_GAMES.filter(game => game.isPlayable);
+    
+    // Then, filter by category support
+    return playableGames.filter(game => {
       return game.supportedCategories.length === 0 || game.supportedCategories.includes(selectedDoc.category);
     });
   }, [selectedDoc]);
@@ -736,3 +735,5 @@ export default function DashboardPage() {
     </>
   );
 }
+
+    

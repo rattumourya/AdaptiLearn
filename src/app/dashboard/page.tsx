@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,6 +15,12 @@ import {
   Sparkles,
   UploadCloud,
   X,
+  Book,
+  Code,
+  FlaskConical,
+  Landmark,
+  Sigma,
+  Languages
 } from "lucide-react";
 import {
   collection,
@@ -77,6 +83,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { customizeGameDifficulty } from "@/ai/flows/game-customization";
 import { validateDocument } from "@/ai/flows/validate-document";
+import { categorizeDocument } from "@/ai/flows/categorize-document";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -90,6 +97,16 @@ const uploadSchema = z.object({
 const gameCustomizationSchema = z.object({
   difficulty: z.enum(["easy", "medium", "hard"]),
 });
+
+const categoryIcons: { [key: string]: React.ElementType } = {
+  "Science": FlaskConical,
+  "History & Social Science": Landmark,
+  "Mathematics": Sigma,
+  "Computer Science & Coding": Code,
+  "Engineering": FlaskConical, // Or another icon
+  "Language Learning & Literature": Languages,
+  "General & Other": Book,
+}
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -247,17 +264,23 @@ export default function DashboardPage() {
             "The provided content is not suitable for generating a game."
         );
       }
+      
+      update({ id: toastId, description: "Validation successful. Categorizing..." });
+      
+      // Step 2: Categorize document
+      const { category } = await categorizeDocument({ documentText: values.text });
 
       update({
         id: toastId,
-        description: "Validation successful. Saving your document.",
+        description: `Categorized as "${category}". Saving your document.`,
       });
 
-      // Step 2: Add document to Firestore
+      // Step 3: Add document to Firestore
       await addDoc(collection(db, "documents"), {
         userId: user.uid,
         title: values.title,
         content: values.text,
+        category: category,
         createdAt: serverTimestamp(),
       });
 
@@ -316,6 +339,7 @@ export default function DashboardPage() {
     try {
       const gameData = await customizeGameDifficulty({
         documentText: selectedDoc.content,
+        documentCategory: selectedDoc.category,
         gameType: selectedGame.name,
         desiredDifficulty: values.difficulty,
       });
@@ -357,20 +381,33 @@ export default function DashboardPage() {
   };
 
   const openGameCustomization = (game: Game) => {
+    // A real implementation would check if the game is playable
+    if (game.id !== 'game-1') {
+      toast({ title: "Coming Soon!", description: `The game "${game.name}" is not yet implemented.`});
+      return;
+    }
     setSelectedGame(game);
     setGameCustomizeOpen(true);
     setGameSelectOpen(false);
   };
 
   const getSafeDate = (timestamp: any): Date => {
-      if (timestamp instanceof Timestamp) {
-        return timestamp.toDate();
-      }
-      if (timestamp && typeof timestamp.seconds === 'number') {
-        return new Date(timestamp.seconds * 1000);
-      }
-      return new Date(timestamp as string);
+    if (timestamp instanceof Timestamp) {
+      return timestamp.toDate();
+    }
+    if (timestamp && typeof timestamp.seconds === 'number') {
+      return new Date(timestamp.seconds * 1000);
+    }
+    return new Date(timestamp as string);
   };
+
+  const filteredGames = useMemo(() => {
+    if (!selectedDoc) return [];
+    return MOCK_GAMES.filter(game => {
+      // If a game supports all categories, or the document's category is included
+      return game.supportedCategories.length === 0 || game.supportedCategories.includes(selectedDoc.category);
+    });
+  }, [selectedDoc]);
 
   if (authLoading) {
     return (
@@ -421,54 +458,61 @@ export default function DashboardPage() {
           ))}
 
         {!isLoadingDocs &&
-          documents.map((doc) => (
-            <Card key={doc.id} className="relative group">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-2 right-2 h-7 w-7 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                onClick={() => handleDeleteDocument(doc.id)}
-                disabled={deletingDocId === doc.id}
-              >
-                {deletingDocId === doc.id ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <X className="h-4 w-4" />
-                )}
-                <span className="sr-only">Delete document</span>
-              </Button>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <FileText className="h-8 w-8 text-primary" />
-                  {doc.createdAt && (
-                    <Badge variant="outline">
-                      {formatDistanceToNow(getSafeDate(doc.createdAt), { addSuffix: true })}
-                    </Badge>
-                  )}
-                </div>
-                <CardTitle className="pt-4">{doc.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground line-clamp-3">
-                  {doc.content}
-                </p>
-              </CardContent>
-              <CardFooter>
+          documents.map((doc) => {
+            const CategoryIcon = categoryIcons[doc.category] || Book;
+            return (
+              <Card key={doc.id} className="relative group flex flex-col">
                 <Button
-                  className="w-full"
-                  onClick={() => openGameSelection(doc)}
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2 h-7 w-7 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                  onClick={() => handleDeleteDocument(doc.id)}
+                  disabled={deletingDocId === doc.id}
                 >
-                  <Gamepad2 className="mr-2" />
-                  Play Games
+                  {deletingDocId === doc.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <X className="h-4 w-4" />
+                  )}
+                  <span className="sr-only">Delete document</span>
                 </Button>
-              </CardFooter>
-            </Card>
-          ))}
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <FileText className="h-8 w-8 text-primary" />
+                    {doc.createdAt && (
+                      <Badge variant="outline">
+                        {formatDistanceToNow(getSafeDate(doc.createdAt), { addSuffix: true })}
+                      </Badge>
+                    )}
+                  </div>
+                  <CardTitle className="pt-4">{doc.title}</CardTitle>
+                   <CardDescription className="flex items-center gap-2 pt-1">
+                      <CategoryIcon className="h-4 w-4"/>
+                      <span>{doc.category}</span>
+                   </CardDescription>
+                </CardHeader>
+                <CardContent className="flex-grow">
+                  <p className="text-sm text-muted-foreground line-clamp-3">
+                    {doc.content}
+                  </p>
+                </CardContent>
+                <CardFooter>
+                  <Button
+                    className="w-full"
+                    onClick={() => openGameSelection(doc)}
+                  >
+                    <Gamepad2 className="mr-2" />
+                    Play Games
+                  </Button>
+                </CardFooter>
+              </Card>
+            )
+          })}
 
         {!isLoadingDocs && (
           <Dialog open={isUploadOpen} onOpenChange={setUploadOpen}>
             <DialogTrigger asChild>
-              <Card className="flex cursor-pointer items-center justify-center border-2 border-dashed bg-transparent transition-all hover:shadow-lg">
+              <Card className="flex cursor-pointer items-center justify-center border-2 border-dashed bg-transparent transition-all hover:shadow-lg min-h-[250px]">
                 <div className="flex flex-col items-center p-8 text-center">
                   <PlusCircle className="h-12 w-12 text-muted-foreground" />
                   <span className="mt-2 text-sm font-medium text-muted-foreground">
@@ -481,8 +525,8 @@ export default function DashboardPage() {
               <DialogHeader>
                 <DialogTitle>Add New Document</DialogTitle>
                 <DialogDescription>
-                  Upload a file (PDF, DOCX, TXT) or paste text to create a new
-                  learning set.
+                  Upload a file (PDF, DOCX, TXT) or paste text. The AI will
+                  process and categorize it for you.
                 </DialogDescription>
               </DialogHeader>
               <Form {...uploadForm}>
@@ -577,13 +621,12 @@ export default function DashboardPage() {
           <DialogHeader>
             <DialogTitle>Select a Game</DialogTitle>
             <DialogDescription>
-              Choose a game to play with words from &quot;{selectedDoc?.title}
-              &quot;.
+              Choose a game for &quot;{selectedDoc?.title}&quot; (Category: {selectedDoc?.category}).
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[70vh] p-1">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 p-4">
-              {MOCK_GAMES.map((game) => (
+              {filteredGames.length > 0 ? filteredGames.map((game) => (
                 <Card
                   key={game.id}
                   className="flex cursor-pointer flex-col transition-all hover:shadow-lg hover:-translate-y-1"
@@ -605,7 +648,15 @@ export default function DashboardPage() {
                     </p>
                   </CardContent>
                 </Card>
-              ))}
+              )) : (
+                 <Alert className="md:col-span-3">
+                    <Gamepad2 className="h-4 w-4" />
+                    <AlertTitle>No Games Available</AlertTitle>
+                    <AlertDescription>
+                      We don&apos;t have any specific games for the &quot;{selectedDoc?.category}&quot; category yet. Check back later!
+                    </AlertDescription>
+                </Alert>
+              )}
             </div>
           </ScrollArea>
         </DialogContent>
@@ -678,3 +729,5 @@ export default function DashboardPage() {
     </>
   );
 }
+
+    

@@ -5,8 +5,9 @@ export interface Document {
   id: string;
   userId: string;
   title: string;
-  createdAt: Timestamp | string; // Can be a Timestamp from Firestore or string
+  createdAt: Timestamp | { seconds: number, nanoseconds: number };
   content: string;
+  category: string; // e.g., "Science", "History", "Coding"
 }
 
 export interface Game {
@@ -14,6 +15,8 @@ export interface Game {
   name: string;
   description: string;
   improves: string[];
+  // An array of categories this game is suitable for. Empty means suitable for all.
+  supportedCategories: string[];
 }
 
 export interface UserProfile {
@@ -23,3 +26,5 @@ export interface UserProfile {
     photoURL?: string;
     createdAt?: string;
 }
+
+    

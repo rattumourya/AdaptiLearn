@@ -15,6 +15,7 @@ import {z} from 'genkit';
 // Input schema remains the same
 const CustomizeGameDifficultyInputSchema = z.object({
   documentText: z.string().describe('The text content of the uploaded document.'),
+  documentCategory: z.string().describe('The identified category of the document (e.g., Science, Coding, History).'),
   gameType: z.string().describe('The type of game to customize (e.g., QuickLearn Session).'),
   desiredDifficulty: z
     .enum(['easy', 'medium', 'hard'])
@@ -62,9 +63,9 @@ const TraceOrTypeRoundSchema = z.object({
 const TrueFalseChallengeRoundSchema = z.object({
     miniGameType: z.enum(['true-false-challenge']).describe("The type of this mini-game round."),
     word: z.string().describe("The word being tested."),
-    imageOrTranslation: z.string().describe("An image data URI or a translated word to pair with the main word."),
-    isCorrectMatch: z.boolean().describe("Whether the word and the image/translation are a correct pair."),
-    displayPrompt: z.string().describe("The prompt to show the user, e.g., 'Is this match correct?'"),
+    statement: z.string().describe("A true or false statement using the word in the context of the document."),
+    isCorrect: z.boolean().describe("Whether the statement is true or false."),
+    displayPrompt: z.string().describe("The prompt to show the user, e.g., 'True or False?'"),
 });
 
 
@@ -118,40 +119,58 @@ const prompt = ai.definePrompt({
   name: 'customizeGameDifficultyPrompt',
   input: {schema: CustomizeGameDifficultyInputSchema},
   output: {schema: CustomizeGameDifficultyOutputSchema},
-  prompt: `You are a senior educational game designer specializing in language acquisition and mobile gamification. Your task is to create an engaging and effective 5-minute learning session based on a user's uploaded document.
+  prompt: `You are a senior educational game designer. Your task is to create a 5-minute learning session based on a user's document.
 
-Document Text: {{{documentText}}}
-Desired Difficulty: {{{desiredDifficulty}}}
+**Document Analysis:**
+- Document Category: **{{{documentCategory}}}**
+- Document Text: {{{documentText}}}
+- Desired Difficulty: **{{{desiredDifficulty}}}**
 
-**Objective:** Generate a list of 10-15 varied, rapid-fire mini-game rounds. The vocabulary and complexity must match the desired difficulty level.
+**Objective:** Generate a list of 10-15 varied, rapid-fire mini-game rounds. The vocabulary, concepts, and complexity must align with BOTH the document category and the desired difficulty level.
 
-**Difficulty Scaling Rules:**
-- **Easy:** Use common, shorter words (3-6 letters). For spelling games, remove only 1-2 vowels. Distractors should be obviously different.
-- **Medium:** Use moderately complex words (5-9 letters). For spelling games, remove ~30% of letters. Distractors should be plausible.
-- **Hard:** Use longer, more complex, or less common words (8+ letters). For spelling games, remove ~50% of letters, including consonants. Distractors should be very similar or conceptually related to the correct answer.
+---
 
-**Instructions:**
-1.  **Analyze and Extract Vocabulary:** Read the document text and extract a list of 15-20 key vocabulary words appropriate for the requested difficulty level, following the rules above.
-2.  **Generate a Game Session Title:** Create a fun, encouraging title for this session (e.g., "Vocabulary Voyage," "Word Power-Up").
-3.  **Create a Mixed Array of Game Rounds:** Construct an array for the 'gameData' field. Each element in the array must be an object matching one of the following schemas. Ensure a good variety of game types.
+**DIFFICULTY & CATEGORY RULES:**
 
-    *   **Word–Image Match (\`WordImageMatchRoundSchema\`):**
-        *   **How:** Pick a noun from the vocabulary list to be the correct 'word'. Provide a placeholder value like "IMAGE_FOR_WORD_X" (e.g., "IMAGE_FOR_WORD_apple") for the 'imageDataUri'. The main flow will replace this with a real, AI-generated image.
-        *   Select 3 other words from the list to be the 'distractorWords'.
+**General Difficulty Scaling:**
+-   **Easy:** Use common, shorter words (3-6 letters). Focus on core concepts. Distractors should be obviously different. For spelling, remove only 1-2 vowels.
+-   **Medium:** Use moderately complex words (5-9 letters). Combine concepts. Distractors should be plausible. For spelling, remove ~30% of letters (vowels and common consonants).
+-   **Hard:** Use longer, complex, or domain-specific terms (8+ letters). Test nuanced relationships between concepts. Distractors should be very similar or conceptually related. For spelling, remove ~50% of letters, including less common consonants.
 
-    *   **Word–Translation Match (\`WordTranslationMatchRoundSchema\`):**
-        *   **How:** Pick a word. Provide its correct English translation. Create 3 plausible but incorrect 'distractorTranslations'. Assume the user's native language is English.
+**Category-Specific Adjustments:**
+-   **For "Science" or "Engineering":** Focus on terminology, definitions, and processes. True/False questions should test relationships between concepts (e.g., "Photosynthesis produces carbon dioxide.").
+-   **For "History" or "Social Science":** Focus on names, dates, events, and concepts. True/False questions should test factual accuracy.
+-   **For "Coding" or "Math":** Focus on syntax, keywords, function names, and formulas. Spelling/Typing games are very important here. Distractors should include common typos (e.g., `functoin` vs `function`). True/False can test logic (e.g., "A 'for' loop is a type of conditional statement.").
+-   **For "Language Learning" or "General":** Use a balanced mix of all game types.
 
-    *   **Spelling Completion (\`SpellingCompletionRoundSchema\`):**
-        *   **How:** Pick a word. Create its 'promptWord' by replacing letters with underscores according to the difficulty rules. List the 'missingLetters' correctly. Provide 3-4 'decoyLetters' that are not in the word.
+---
 
-    *   **Trace or Type (\`TraceOrTypeRoundSchema\`):**
-        *   **How:** Pick a moderately complex word from the list suitable for writing practice. This is a simple round.
+**INSTRUCTIONS:**
 
-    *   **True/False Challenge (\`TrueFalseChallengeRoundSchema\`):**
-        *   **How:** Pick a word. Pair it with a translation. 50% of the time, the translation should be correct ('isCorrectMatch: true'). 50% of the time, use a translation for a different word from the document ('isCorrectMatch: false'). For 'imageOrTranslation' just provide the translated word.
+1.  **Analyze and Extract Vocabulary:** Read the document and extract 15-20 key terms appropriate for the requested category and difficulty.
+2.  **Generate a Game Title:** Create a fun, encouraging title (e.g., "Biology Blitz," "Code Breaker Challenge").
+3.  **Create Mixed Game Rounds:** Construct an array for 'gameData' with a good variety of game types, following the rules above.
 
-4.  **Final Output:** Ensure the 'gameType' in the output is set to the input 'gameType', and the 'gameData' is the array of mini-game rounds you designed.
+    *   **Word–Image Match:**
+        *   Pick a concrete noun from the vocabulary list.
+        *   For 'imageDataUri', provide a placeholder like "IMAGE_FOR_WORD_X" (e.g., "IMAGE_FOR_WORD_Mitochondria"). The system will generate the image.
+        *   For "Hard" difficulty, choose distractors that are visually or functionally similar.
+
+    *   **Word–Translation Match:**
+        *   Pick a word. Provide its correct English translation.
+        *   For "Hard" difficulty, create very plausible but incorrect 'distractorTranslations'.
+
+    *   **Spelling Completion / Trace or Type:**
+        *   Pick a word. Create its 'promptWord' according to difficulty rules.
+        *   For "Coding/Math", this is a high-value game type.
+
+    *   **True/False Challenge:**
+        *   Pick a key term from the document.
+        *   Create a factual 'statement' about that term, based on the document's context and category.
+        *   Set 'isCorrect' to true or false. 50/50 split.
+        *   For "Hard" difficulty, the statements should be nuanced and require careful reading.
+
+4.  **Final Output:** Ensure the 'gameType' in the output matches the input 'gameType', and 'gameData' is the array of mini-game rounds you designed.
 `,
 });
 
@@ -193,3 +212,5 @@ const customizeGameDifficultyFlow = ai.defineFlow(
     throw new Error("Failed to get a response from the AI model.");
   }
 );
+
+    

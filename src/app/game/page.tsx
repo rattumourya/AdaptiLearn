@@ -158,7 +158,7 @@ function GameComponent() {
         case 'word-image-match': return round.word;
         case 'spelling-completion': return round.word;
         case 'trace-or-type': return round.word;
-        case 'true-false-challenge': return round.isCorrectMatch ? 'True' : 'False';
+        case 'true-false-challenge': return round.isCorrect ? 'True' : 'False';
         default: return '';
     }
   }
@@ -204,7 +204,7 @@ function GameComponent() {
             isAnswerCorrect = submittedAnswer === currentRound.word.toLowerCase();
             break;
         case 'true-false-challenge':
-            const expected = currentRound.isCorrectMatch ? 'true' : 'false';
+            const expected = currentRound.isCorrect ? 'true' : 'false';
             isAnswerCorrect = submittedAnswer === expected;
             break;
     }
@@ -245,13 +245,13 @@ function GameComponent() {
 
   const handleRevealAnswer = () => {
     if (!gameData || isCorrect !== null) return;
+    setStreak(0);
     const correctAnswer = getCorrectAnswerForRound(gameData.gameData[currentRoundIndex]);
 
     toast({
       title: 'Answer Revealed',
       description: `The correct answer was: ${correctAnswer}`,
     });
-    setStreak(0);
     handleIncorrectAnswer();
   };
 
@@ -405,10 +405,8 @@ function GameComponent() {
                 
                 {currentRound.miniGameType === 'true-false-challenge' && (
                     <div className="flex flex-col items-center gap-6">
-                        <Card className="p-4">
-                            <p className="text-2xl font-bold">{currentRound.word}</p>
-                            <p className="text-muted-foreground">is</p>
-                            <p className="text-2xl font-bold">{currentRound.imageOrTranslation}</p>
+                        <Card className="p-4 bg-muted/50 w-full">
+                           <p className="text-lg">{currentRound.statement}</p>
                         </Card>
                         <div className="flex gap-4">
                             <Button className="h-16 w-32 text-lg bg-green-100 hover:bg-green-200 text-green-800" onClick={() => handleSubmitAnswer('true')} disabled={isCorrect !== null}>
@@ -464,3 +462,5 @@ export default function GamePage() {
     </Suspense>
   );
 }
+
+    

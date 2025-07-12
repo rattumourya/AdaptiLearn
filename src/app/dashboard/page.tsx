@@ -447,7 +447,7 @@ export default function DashboardPage() {
         </Alert>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
         {isLoadingDocs &&
           Array.from({ length: 3 }).map((_, i) => (
             <Card key={i}>
@@ -631,7 +631,7 @@ export default function DashboardPage() {
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[70vh] p-1">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
               {filteredGames.length > 0 ? filteredGames.map((game) => (
                 <Card
                   key={game.id}
@@ -735,5 +735,3 @@ export default function DashboardPage() {
     </>
   );
 }
-
-    

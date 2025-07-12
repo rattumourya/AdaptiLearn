@@ -56,6 +56,7 @@ function GameComponent() {
   const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
   const [userAnswer, setUserAnswer] = useState("");
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
+  const [revealedAnswer, setRevealedAnswer] = useState<string | null>(null);
   const [score, setScore] = useState(0);
   const [isHintLoading, setIsHintLoading] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
@@ -138,6 +139,7 @@ function GameComponent() {
       }
       setIsCorrect(null);
       setUserAnswer("");
+      setRevealedAnswer(null);
       setCurrentRoundIndex(nextRoundIndex);
     }, delay);
   }, [currentRoundIndex, gameData, lives, timeLeft, finishGame]);
@@ -149,19 +151,34 @@ function GameComponent() {
     setIsCorrect(true);
     advanceToNextRound(1200);
   }, [streak, advanceToNextRound]);
+  
+  const getCorrectAnswerForRound = (round: any) => {
+    switch (round.miniGameType) {
+        case 'word-translation-match': return round.correctTranslation;
+        case 'word-image-match': return round.word;
+        case 'spelling-completion': return round.word;
+        case 'trace-or-type': return round.word;
+        case 'true-false-challenge': return round.isCorrectMatch ? 'True' : 'False';
+        default: return '';
+    }
+  }
 
   const handleIncorrectAnswer = useCallback(() => {
     const newLives = lives - 1;
     setLives(newLives);
     setStreak(0);
     setIsCorrect(false);
+    if(gameData) {
+        const correct = getCorrectAnswerForRound(gameData.gameData[currentRoundIndex]);
+        setRevealedAnswer(correct);
+    }
     
     if (newLives <= 0) {
-        setTimeout(() => finishGame(), 1500);
+        setTimeout(() => finishGame(), 2500);
     } else {
-        advanceToNextRound(1500);
+        advanceToNextRound(2500);
     }
-  }, [lives, advanceToNextRound, finishGame]);
+  }, [lives, advanceToNextRound, finishGame, gameData, currentRoundIndex]);
 
   const handleSubmitAnswer = (e: React.FormEvent | string) => {
     if (typeof e !== 'string') e.preventDefault();
@@ -228,22 +245,13 @@ function GameComponent() {
 
   const handleRevealAnswer = () => {
     if (!gameData || isCorrect !== null) return;
-    let correctAnswer = 'N/A';
-    const currentRound = gameData.gameData[currentRoundIndex];
-    
-    switch(currentRound.miniGameType) {
-        case 'word-translation-match': correctAnswer = currentRound.correctTranslation; break;
-        case 'word-image-match': correctAnswer = currentRound.word; break;
-        case 'spelling-completion': correctAnswer = currentRound.word; break;
-        case 'trace-or-type': correctAnswer = currentRound.word; break;
-        case 'true-false-challenge': correctAnswer = `The statement was ${currentRound.isCorrectMatch}`; break;
-    }
+    const correctAnswer = getCorrectAnswerForRound(gameData.gameData[currentRoundIndex]);
 
     toast({
       title: 'Answer Revealed',
       description: `The correct answer was: ${correctAnswer}`,
     });
-    setStreak(0); // Reset streak as a penalty for revealing the answer.
+    setStreak(0);
     handleIncorrectAnswer();
   };
 
@@ -341,6 +349,13 @@ function GameComponent() {
     return (
         <CardContent className={cn("min-h-[350px] flex flex-col items-center justify-center p-4 transition-all")}>
             <div className={cn("w-full text-center p-4 rounded-lg ring-4 transition-all", feedbackClass)}>
+                
+                {isCorrect === false && revealedAnswer && (
+                    <div className="mb-4 p-3 rounded-md bg-red-100 text-red-800 font-semibold">
+                        Correct answer: {revealedAnswer}
+                    </div>
+                )}
+
                 <p className="font-semibold text-lg mb-4">{currentRound.displayPrompt}</p>
 
                 {currentRound.miniGameType === 'word-image-match' && (

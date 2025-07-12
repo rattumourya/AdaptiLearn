@@ -125,8 +125,13 @@ Desired Difficulty: {{{desiredDifficulty}}}
 
 **Objective:** Generate a list of 10-15 varied, rapid-fire mini-game rounds. The vocabulary and complexity must match the desired difficulty level.
 
+**Difficulty Scaling Rules:**
+- **Easy:** Use common, shorter words (3-6 letters). For spelling games, remove only 1-2 vowels. Distractors should be obviously different.
+- **Medium:** Use moderately complex words (5-9 letters). For spelling games, remove ~30% of letters. Distractors should be plausible.
+- **Hard:** Use longer, more complex, or less common words (8+ letters). For spelling games, remove ~50% of letters, including consonants. Distractors should be very similar or conceptually related to the correct answer.
+
 **Instructions:**
-1.  **Analyze and Extract Vocabulary:** Read the document text and extract a list of 15-20 key vocabulary words appropriate for the requested difficulty level.
+1.  **Analyze and Extract Vocabulary:** Read the document text and extract a list of 15-20 key vocabulary words appropriate for the requested difficulty level, following the rules above.
 2.  **Generate a Game Session Title:** Create a fun, encouraging title for this session (e.g., "Vocabulary Voyage," "Word Power-Up").
 3.  **Create a Mixed Array of Game Rounds:** Construct an array for the 'gameData' field. Each element in the array must be an object matching one of the following schemas. Ensure a good variety of game types.
 
@@ -138,7 +143,7 @@ Desired Difficulty: {{{desiredDifficulty}}}
         *   **How:** Pick a word. Provide its correct English translation. Create 3 plausible but incorrect 'distractorTranslations'. Assume the user's native language is English.
 
     *   **Spelling Completion (\`SpellingCompletionRoundSchema\`):**
-        *   **How:** Pick a word. Create its 'promptWord' by replacing 30-50% of its vowels with underscores. List the 'missingLetters' correctly. Provide 3-4 'decoyLetters' that are not in the word.
+        *   **How:** Pick a word. Create its 'promptWord' by replacing letters with underscores according to the difficulty rules. List the 'missingLetters' correctly. Provide 3-4 'decoyLetters' that are not in the word.
 
     *   **Trace or Type (\`TraceOrTypeRoundSchema\`):**
         *   **How:** Pick a moderately complex word from the list suitable for writing practice. This is a simple round.

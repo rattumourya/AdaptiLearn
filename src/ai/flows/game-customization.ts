@@ -170,6 +170,15 @@ const prompt = ai.definePrompt({
         *   **Medium:** 4-5 items requiring more specific knowledge (e.g., key battles in one war).
         *   **Hard:** 5-6 nuanced, conceptually similar, or closely timed items.
 
+*   **If Game Type is "Spelling Bee":**
+    *   **THIS IS THE ONLY GAME TYPE TO GENERATE.** The 'gameData' array should **only** contain 'trace-or-type' rounds.
+    *   **Extraction:** Identify 5-10 key vocabulary terms from the document.
+    *   **Prompt Generation:** For each term, create a 'displayPrompt' that is a clear definition or a contextual clue based on the document. For example, for the word "photosynthesis", the prompt could be "The process by which green plants use sunlight to synthesize foods."
+    *   **Difficulty Scaling:**
+        *   **Easy:** Use shorter, more common words.
+        *   **Medium:** Use moderately complex words.
+        *   **Hard:** Use long, domain-specific, or easily misspelled words.
+
 ---
 
 **GENERAL DIFFICULTY & CATEGORY RULES (for "Personalized Practice"):**

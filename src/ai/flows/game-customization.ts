@@ -16,7 +16,7 @@ import {z} from 'genkit';
 const CustomizeGameDifficultyInputSchema = z.object({
   documentText: z.string().describe('The text content of the uploaded document.'),
   documentCategory: z.string().describe('The identified category of the document (e.g., Science, Coding, History).'),
-  gameType: z.string().describe('The type of game to customize (e.g., QuickLearn Session).'),
+  gameType: z.string().describe('The type of game to customize (e.g., Personalized Practice).'),
   desiredDifficulty: z
     .enum(['easy', 'medium', 'hard'])
     .describe('The desired difficulty level for the game.'),
@@ -121,7 +121,7 @@ const generateImageForWord = ai.defineFlow(
     async (word) => {
         const {media} = await ai.generate({
             model: 'googleai/gemini-2.0-flash-preview-image-generation',
-            prompt: `Generate a vibrant, clean, flat illustration of a "${word}", suitable for a modern educational app. The image should be clear, easily recognizable, and visually engaging.`,
+            prompt: `Generate a vibrant, clean, flat illustration of "${word}", suitable for a modern educational app. The image should be clear, easily recognizable, and visually engaging.`,
             config: {
                 responseModalities: ['TEXT', 'IMAGE'],
             },
@@ -135,72 +135,82 @@ const prompt = ai.definePrompt({
   name: 'customizeGameDifficultyPrompt',
   input: {schema: CustomizeGameDifficultyInputSchema},
   output: {schema: CustomizeGameDifficultyOutputSchema},
-  prompt: `You are a senior educational game designer. Your task is to create a learning session based on a user's document and chosen game type.
+  prompt: `You are a master educational game designer, creating a fun, 5-minute learning session based on a user's document.
 
-**Document Analysis:**
+**INPUT:**
 - Document Category: **{{{documentCategory}}}**
-- Document Text: {{{documentText}}}
-- Desired Game Type: **{{{gameType}}}**
+- Document Text (first 4000 chars): {{{documentText}}}
+- Requested Game Type: **{{{gameType}}}**
 - Desired Difficulty: **{{{desiredDifficulty}}}**
 
-**Objective:** Generate a list of 5-10 themed, rapid-fire mini-game rounds. The vocabulary, concepts, and complexity must align with the document category, game type, and difficulty.
+**PRIMARY OBJECTIVE:** Generate a list of 5-10 varied, engaging mini-game rounds. The vocabulary, concepts, and complexity MUST align with the document's category, the requested game type, and the desired difficulty.
 
 ---
 
-**GAME TYPE RULES:**
+**GAME TYPE RULES (Most Important):**
 
 *   **If Game Type is "Personalized Practice":**
-    *   Generate a good variety of game types (Word-Image, Spelling, True/False, etc.).
-    *   Follow the general difficulty and category rules below.
+    *   This is a mixed-modality session. Generate a good variety of game types (Word-Image, Spelling, True/False, etc.) based on the category and difficulty rules below.
+    *   Prioritize variety to keep the user engaged.
 
 *   **If Game Type is "Formula Scramble":**
-    *   **This is the ONLY game type to generate.** The 'gameData' array should only contain 'formula-scramble' rounds.
+    *   **THIS IS THE ONLY GAME TYPE TO GENERATE.** The 'gameData' array should **only** contain 'formula-scramble' rounds.
     *   **Extraction:** Identify 5-10 key formulas or equations from the document.
-    *   **Difficulty Scaling for Formulas:**
-        *   **Easy:** Use shorter formulas (2-4 parts).
-        *   **Medium:** Use formulas with 4-6 parts.
-        *   **Hard:** Use longer, more complex formulas (6+ parts) and break them into smaller, trickier pieces.
-    *   **Scrambling:** For each formula, break it into its logical components (variables, operators, numbers, functions) and provide these as the 'scrambledParts' array. Ensure the array is shuffled. Example: for "E = mc^2", the parts could be ["E", "=", "m", "c^2"].
+    *   **Difficulty Scaling:**
+        *   **Easy:** Short formulas (2-4 parts).
+        *   **Medium:** Formulas with 4-6 parts.
+        *   **Hard:** Longer, more complex formulas (6+ parts), broken into smaller, trickier pieces.
+    *   **Scrambling:** Break each formula into its logical components (variables, operators, numbers, functions) and provide them shuffled in the 'scrambledParts' array.
 
 *   **If Game Type is "Timeline Teaser":**
-    *   **This is the ONLY game type to generate.** The 'gameData' array should only contain 'timeline-teaser' rounds.
-    *   **Extraction:** Identify 5-10 sets of related historical events, figures, or steps in a process from the document that have a clear chronological order.
-    *   **Difficulty Scaling for Timelines:**
-        *   **Easy:** Use a small number of items (3-4) that are widely separated in time or sequence (e.g., "Stone Age", "Roman Empire", "World War II").
-        *   **Medium:** Use 4-5 items that are closer together or require more specific knowledge (e.g., key battles within a single war).
-        *   **Hard:** Use 5-6 items that are very close in time, nuanced, or conceptually similar, requiring precise knowledge to order correctly.
-    *   **Output Format:** For each round, provide the items in the correct order in the 'correctOrder' array, and a shuffled version in the 'scrambledOrder' array.
+    *   **THIS IS THE ONLY GAME TYPE TO GENERATE.** The 'gameData' array should **only** contain 'timeline-teaser' rounds.
+    *   **Extraction:** Identify 5-10 sets of historical events, figures, or process steps from the document with a clear chronological order.
+    *   **Difficulty Scaling:**
+        *   **Easy:** 3-4 widely separated items (e.g., "Stone Age", "Roman Empire", "World War II").
+        *   **Medium:** 4-5 items requiring more specific knowledge (e.g., key battles in one war).
+        *   **Hard:** 5-6 nuanced, conceptually similar, or closely timed items.
 
 ---
 
 **GENERAL DIFFICULTY & CATEGORY RULES (for "Personalized Practice"):**
 
-**General Difficulty Scaling:**
--   **Easy:** Use common, shorter words (3-6 letters). Focus on core concepts. Distractors should be obviously different. For spelling, remove only 1-2 vowels.
--   **Medium:** Use moderately complex words (5-9 letters). Combine concepts. Distractors should be plausible. For spelling, remove ~30% of letters (vowels and common consonants).
--   **Hard:** Use longer, complex, or domain-specific terms (8+ letters). Test nuanced relationships between concepts. Distractors should be very similar or conceptually related. For spelling, remove ~50% of letters, including less common consonants.
+**1. General Difficulty Scaling (Across all games):**
+*   **Easy:** Use common, shorter words (3-6 letters). Focus on core concepts. Distractors should be obviously different.
+*   **Medium:** Use moderately complex words (5-9 letters). Combine concepts. Distractors should be plausible.
+*   **Hard:** Use long, complex, domain-specific terms (8+ letters). Test nuanced relationships. Distractors should be very similar or conceptually related.
 
-**Category-Specific Adjustments:**
--   **For "Science" or "Engineering":** Focus on terminology, definitions, and processes. True/False questions should test relationships between concepts (e.g., "Photosynthesis produces carbon dioxide.").
--   **For "History & Social Science":** Focus on names, dates, events, and concepts. True/False questions should test factual accuracy.
--   **For "Computer Science & Coding":** Focus on syntax, keywords, function names, and formulas. Spelling/Typing games are very important here. Distractors should include common typos (e.g., 'functoin' vs 'function'). True/False can test logic (e.g., "A 'for' loop is a type of conditional statement.").
--   **For "Language Learning" or "General":** Use a balanced mix of all game types.
+**2. Category-Specific Game Generation (BE CREATIVE!):**
+*   **For "Science" or "Engineering":**
+    *   Generate \`True/False\` questions testing relationships (e.g., "True or False: Photosynthesis produces carbon dioxide.").
+    *   Prioritize \`Spelling Completion\` and \`Trace-or-Type\` for key terminology.
+    *   \`Word-Image Match\` is great for physical objects (e.g., a cell, a tool).
+*   **For "History & Social Science":**
+    *   Generate \`True/False\` questions testing factual accuracy about events or figures.
+    *   Could you create a \`True/False\` prompt like "Who am I? I was the 16th president of the USA. My name is George Washington." (Answer: False). This is more engaging.
+    *   \`Word Translation Match\` could be used for key terms and their simple definitions.
+*   **For "Computer Science & Coding":**
+    *   Prioritize \`Spelling Completion\` and \`Trace-or-Type\` for syntax, keywords, and function names.
+    *   \`True/False\` can test logic (e.g., "A 'for' loop is a type of conditional statement.").
+    *   For \`Spelling Completion\`, make "Hard" mode include special characters like underscores or brackets.
+*   **For "Language Learning & Literature" or "General":**
+    *   Use a balanced mix of all available game types. \`Word Translation Match\` and \`Word-Image Match\` are particularly effective here.
+
+**3. Specific Mini-Game Mechanics:**
+*   **For \`Spelling Completion\`:**
+    *   **Easy:** Create \`promptWord\` by removing 1-2 vowels.
+    *   **Medium:** Remove ~30% of letters (vowels and common consonants).
+    *   **Hard:** Remove ~50% of letters, including less common consonants or symbols for coding.
+    *   \`missingLetters\` should contain the correct removed letters. \`decoyLetters\` should contain plausible but incorrect letters.
+*   **For \`Word-Image Match\`:**
+    *   Pick a concrete noun. The system will handle image generation. Just provide the placeholder \`imageDataUri: "IMAGE_FOR_WORD_YourWord"\`.
 
 ---
 
-**INSTRUCTIONS:**
+**FINAL INSTRUCTIONS:**
 
-1.  **Analyze and Extract:** Read the document and extract key terms/formulas/events appropriate for the requested game type, category, and difficulty.
-2.  **Generate a Game Title:** Create a fun, encouraging title based on the game type and document (e.g., "Biology Blitz," "Calculus Formula Scramble", "American Revolution Timeline").
-3.  **Create Game Rounds:** Construct an array for 'gameData' following the specific rules for the chosen 'gameType'.
-
-    *   **For Word–Image Match:**
-        *   Pick a concrete noun from the vocabulary list.
-        *   For 'imageDataUri', provide a placeholder like "IMAGE_FOR_WORD_X" (e.g., "IMAGE_FOR_WORD_Mitochondria"). The system will generate the image.
-
-    *   **For other "Personalized Practice" games:** Follow the general difficulty and category rules.
-
-4.  **Final Output:** Ensure the 'gameType' in the output matches the input 'gameType', and 'gameData' is the array of mini-game rounds you designed.
+1.  **Generate a Game Title:** Create a fun, encouraging title (e.g., "Biology Blitz," "Calculus Scramble", "Revolution Timeline").
+2.  **Construct \`gameData\` Array:** Build the array of mini-game rounds following all rules above.
+3.  **Ensure Output Matches Request:** The \`gameType\` in your output must match the requested \`gameType\`.
 `,
 });
 
@@ -214,7 +224,10 @@ const customizeGameDifficultyFlow = ai.defineFlow(
     let attempts = 0;
     while (attempts < 2) {
       try {
-        const {output: structuredOutput} = await prompt(input);
+        const {output: structuredOutput} = await prompt({
+            ...input,
+            documentText: input.documentText.substring(0, 4000) // Truncate text for performance
+        });
         if (!structuredOutput) throw new Error("AI did not return a structured output.");
 
         // Asynchronously generate images if needed
@@ -244,5 +257,3 @@ const customizeGameDifficultyFlow = ai.defineFlow(
     throw new Error("Failed to get a response from the AI model.");
   }
 );
-
-    

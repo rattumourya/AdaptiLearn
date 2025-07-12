@@ -20,11 +20,11 @@ export const MOCK_GAMES: Game[] = [
   },
   {
     id: 'game-3',
-    name: 'Code Completion Challenge',
-    description: 'Type the missing pieces of code snippets taken directly from your notes or files. Perfect for syntax practice.',
+    name: 'Spelling Bee',
+    description: 'A classic spelling challenge using the key vocabulary from your uploaded document. How many can you get right?',
     improves: ['Spelling', 'Syntax', 'Memory'],
-    supportedCategories: ["Computer Science & Coding"],
-    isPlayable: false,
+    supportedCategories: ["Computer Science & Coding", "Language Learning & Literature", "Science", "General & Other"],
+    isPlayable: true, // This is now playable
   },
   {
     id: 'game-4',

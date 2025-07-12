@@ -135,36 +135,38 @@ export default function ResultsPage() {
               </AlertDescription>
             </Alert>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Game</TableHead>
-                  <TableHead>Difficulty</TableHead>
-                  <TableHead className="text-right">Score</TableHead>
-                  <TableHead className="text-right">Date Completed</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {results.map((result) => (
-                  <TableRow key={result.id}>
-                    <TableCell className="font-medium">
-                      {result.gameType}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="capitalize">{result.difficulty}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-bold text-primary">
-                      {result.score}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {result.completedAt
-                        ? format(getSafeDate(result.completedAt), "MMM d, yyyy 'at' h:mm a")
-                        : "N/A"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="w-full overflow-x-auto">
+                <Table>
+                <TableHeader>
+                    <TableRow>
+                    <TableHead>Game</TableHead>
+                    <TableHead>Difficulty</TableHead>
+                    <TableHead className="text-right">Score</TableHead>
+                    <TableHead className="text-right">Date Completed</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {results.map((result) => (
+                    <TableRow key={result.id}>
+                        <TableCell className="font-medium">
+                        {result.gameType}
+                        </TableCell>
+                        <TableCell>
+                        <Badge variant="outline" className="capitalize">{result.difficulty}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-primary">
+                        {result.score}
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground whitespace-nowrap">
+                        {result.completedAt
+                            ? format(getSafeDate(result.completedAt), "MMM d, yyyy 'at' h:mm a")
+                            : "N/A"}
+                        </TableCell>
+                    </TableRow>
+                    ))}
+                </TableBody>
+                </Table>
+            </div>
           )}
         </CardContent>
       </Card>

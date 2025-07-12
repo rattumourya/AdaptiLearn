@@ -140,7 +140,7 @@ const prompt = ai.definePrompt({
 **Category-Specific Adjustments:**
 -   **For "Science" or "Engineering":** Focus on terminology, definitions, and processes. True/False questions should test relationships between concepts (e.g., "Photosynthesis produces carbon dioxide.").
 -   **For "History" or "Social Science":** Focus on names, dates, events, and concepts. True/False questions should test factual accuracy.
--   **For "Coding" or "Math":** Focus on syntax, keywords, function names, and formulas. Spelling/Typing games are very important here. Distractors should include common typos (e.g., `functoin` vs `function`). True/False can test logic (e.g., "A 'for' loop is a type of conditional statement.").
+-   **For "Coding" or "Math":** Focus on syntax, keywords, function names, and formulas. Spelling/Typing games are very important here. Distractors should include common typos (e.g., 'functoin' vs 'function'). True/False can test logic (e.g., "A 'for' loop is a type of conditional statement.").
 -   **For "Language Learning" or "General":** Use a balanced mix of all game types.
 
 ---
@@ -212,5 +212,3 @@ const customizeGameDifficultyFlow = ai.defineFlow(
     throw new Error("Failed to get a response from the AI model.");
   }
 );
-
-    
